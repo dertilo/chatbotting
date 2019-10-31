@@ -56,7 +56,7 @@ class DBQuery:
             # Get key with max value (ie slot value with highest count of available results)
             filled_inform[key] = max(values_dict, key=values_dict.get)
         else:
-            filled_inform[key] = 'no match available'
+            filled_inform[key] = "no match available"
 
         return filled_inform
 
@@ -98,7 +98,11 @@ class DBQuery:
         """
 
         # Filter non-queryable items and keys with the value 'anything' since those are inconsequential to the constraints
-        new_constraints = {k: v for k, v in constraints.items() if k not in self.no_query and v is not 'anything'}
+        new_constraints = {
+            k: v
+            for k, v in constraints.items()
+            if k not in self.no_query and v is not "anything"
+        }
 
         inform_items = frozenset(new_constraints.items())
         cache_return = self.cached_db[inform_items]
@@ -158,7 +162,7 @@ class DBQuery:
         # If it made it down here then a new query was made and it must add it to cached_db_slot and return it
         # Init all key values with 0
         db_results = {key: 0 for key in current_informs.keys()}
-        db_results['matching_all_constraints'] = 0
+        db_results["matching_all_constraints"] = 0
 
         for id in self.database.keys():
             all_slots_match = True
@@ -167,7 +171,7 @@ class DBQuery:
                 if CI_key in self.no_query:
                     continue
                 # If anything all_slots_match stays true AND the specific key slot gets a +1
-                if CI_value == 'anything':
+                if CI_value == "anything":
                     db_results[CI_key] += 1
                     continue
                 if CI_key in self.database[id].keys():
@@ -177,7 +181,8 @@ class DBQuery:
                         all_slots_match = False
                 else:
                     all_slots_match = False
-            if all_slots_match: db_results['matching_all_constraints'] += 1
+            if all_slots_match:
+                db_results["matching_all_constraints"] += 1
 
         # update cache (set the empty dict)
         self.cached_db_slot[inform_items].update(db_results)

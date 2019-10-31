@@ -26,22 +26,22 @@ class DQNAgent:
 
         """
 
-        self.C = constants['agent']
+        self.C = constants["agent"]
         self.memory = []
         self.memory_index = 0
-        self.max_memory_size = self.C['max_mem_size']
-        self.eps = self.C['epsilon_init']
-        self.vanilla = self.C['vanilla']
-        self.lr = self.C['learning_rate']
-        self.gamma = self.C['gamma']
-        self.batch_size = self.C['batch_size']
-        self.hidden_size = self.C['dqn_hidden_size']
+        self.max_memory_size = self.C["max_mem_size"]
+        self.eps = self.C["epsilon_init"]
+        self.vanilla = self.C["vanilla"]
+        self.lr = self.C["learning_rate"]
+        self.gamma = self.C["gamma"]
+        self.batch_size = self.C["batch_size"]
+        self.hidden_size = self.C["dqn_hidden_size"]
 
-        self.load_weights_file_path = self.C['load_weights_file_path']
-        self.save_weights_file_path = self.C['save_weights_file_path']
+        self.load_weights_file_path = self.C["load_weights_file_path"]
+        self.save_weights_file_path = self.C["save_weights_file_path"]
 
         if self.max_memory_size < self.batch_size:
-            raise ValueError('Max memory size must be at least as great as batch size!')
+            raise ValueError("Max memory size must be at least as great as batch size!")
 
         self.state_size = state_size
         self.possible_actions = agent_actions
@@ -60,16 +60,16 @@ class DQNAgent:
         """Builds and returns model/graph of neural network."""
 
         model = Sequential()
-        model.add(Dense(self.hidden_size, input_dim=self.state_size, activation='relu'))
-        model.add(Dense(self.num_actions, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=self.lr))
+        model.add(Dense(self.hidden_size, input_dim=self.state_size, activation="relu"))
+        model.add(Dense(self.num_actions, activation="linear"))
+        model.compile(loss="mse", optimizer=Adam(lr=self.lr))
         return model
 
     def reset(self):
         """Resets the rule-based variables."""
 
         self.rule_current_slot_index = 0
-        self.rule_phase = 'not done'
+        self.rule_phase = "not done"
 
     def get_action(self, state, use_rule=False):
         """
@@ -114,14 +114,22 @@ class DQNAgent:
         if self.rule_current_slot_index < len(self.rule_request_set):
             slot = self.rule_request_set[self.rule_current_slot_index]
             self.rule_current_slot_index += 1
-            rule_response = {'intent': 'request', 'inform_slots': {}, 'request_slots': {slot: 'UNK'}}
-        elif self.rule_phase == 'not done':
-            rule_response = {'intent': 'match_found', 'inform_slots': {}, 'request_slots': {}}
-            self.rule_phase = 'done'
-        elif self.rule_phase == 'done':
-            rule_response = {'intent': 'done', 'inform_slots': {}, 'request_slots': {}}
+            rule_response = {
+                "intent": "request",
+                "inform_slots": {},
+                "request_slots": {slot: "UNK"},
+            }
+        elif self.rule_phase == "not done":
+            rule_response = {
+                "intent": "match_found",
+                "inform_slots": {},
+                "request_slots": {},
+            }
+            self.rule_phase = "done"
+        elif self.rule_phase == "done":
+            rule_response = {"intent": "done", "inform_slots": {}, "request_slots": {}}
         else:
-            raise Exception('Should not have reached this clause')
+            raise Exception("Should not have reached this clause")
 
         index = self._map_action_to_index(rule_response)
         return index, rule_response
@@ -140,7 +148,7 @@ class DQNAgent:
         for (i, action) in enumerate(self.possible_actions):
             if response == action:
                 return i
-        raise ValueError('Response: {} not found in possible actions'.format(response))
+        raise ValueError("Response: {} not found in possible actions".format(response))
 
     def _dqn_action(self, state):
         """
@@ -172,7 +180,7 @@ class DQNAgent:
         for (i, action) in enumerate(self.possible_actions):
             if index == i:
                 return copy.deepcopy(action)
-        raise ValueError('Index: {} not in range of possible actions'.format(index))
+        raise ValueError("Index: {} not in range of possible actions".format(index))
 
     def _dqn_predict_one(self, state, target=False):
         """
@@ -186,7 +194,9 @@ class DQNAgent:
             numpy.array
         """
 
-        return self._dqn_predict(state.reshape(1, self.state_size), target=target).flatten()
+        return self._dqn_predict(
+            state.reshape(1, self.state_size), target=target
+        ).flatten()
 
     def _dqn_predict(self, states, target=False):
         """
@@ -251,13 +261,20 @@ class DQNAgent:
             states = np.array([sample[0] for sample in batch])
             next_states = np.array([sample[3] for sample in batch])
 
-            assert states.shape == (self.batch_size, self.state_size), 'States Shape: {}'.format(states.shape)
+            assert states.shape == (
+                self.batch_size,
+                self.state_size,
+            ), "States Shape: {}".format(states.shape)
             assert next_states.shape == states.shape
 
             beh_state_preds = self._dqn_predict(states)  # For leveling error
             if not self.vanilla:
-                beh_next_states_preds = self._dqn_predict(next_states)  # For indexing for DDQN
-            tar_next_state_preds = self._dqn_predict(next_states, target=True)  # For target value for DQN (& DDQN)
+                beh_next_states_preds = self._dqn_predict(
+                    next_states
+                )  # For indexing for DDQN
+            tar_next_state_preds = self._dqn_predict(
+                next_states, target=True
+            )  # For target value for DQN (& DDQN)
 
             inputs = np.zeros((self.batch_size, self.state_size))
             targets = np.zeros((self.batch_size, self.num_actions))
@@ -265,7 +282,9 @@ class DQNAgent:
             for i, (s, a, r, s_, d) in enumerate(batch):
                 t = beh_state_preds[i]
                 if not self.vanilla:
-                    t[a] = r + self.gamma * tar_next_state_preds[i][np.argmax(beh_next_states_preds[i])] * (not d)
+                    t[a] = r + self.gamma * tar_next_state_preds[i][
+                        np.argmax(beh_next_states_preds[i])
+                    ] * (not d)
                 else:
                     t[a] = r + self.gamma * np.amax(tar_next_state_preds[i]) * (not d)
 
@@ -284,9 +303,9 @@ class DQNAgent:
 
         if not self.save_weights_file_path:
             return
-        beh_save_file_path = re.sub(r'\.h5', r'_beh.h5', self.save_weights_file_path)
+        beh_save_file_path = re.sub(r"\.h5", r"_beh.h5", self.save_weights_file_path)
         self.beh_model.save_weights(beh_save_file_path)
-        tar_save_file_path = re.sub(r'\.h5', r'_tar.h5', self.save_weights_file_path)
+        tar_save_file_path = re.sub(r"\.h5", r"_tar.h5", self.save_weights_file_path)
         self.tar_model.save_weights(tar_save_file_path)
 
     def _load_weights(self):
@@ -294,7 +313,7 @@ class DQNAgent:
 
         if not self.load_weights_file_path:
             return
-        beh_load_file_path = re.sub(r'\.h5', r'_beh.h5', self.load_weights_file_path)
+        beh_load_file_path = re.sub(r"\.h5", r"_beh.h5", self.load_weights_file_path)
         self.beh_model.load_weights(beh_load_file_path)
-        tar_load_file_path = re.sub(r'\.h5', r'_tar.h5', self.load_weights_file_path)
+        tar_load_file_path = re.sub(r"\.h5", r"_tar.h5", self.load_weights_file_path)
         self.tar_model.load_weights(tar_load_file_path)

@@ -18,9 +18,9 @@ class ErrorModelController:
         """
 
         self.movie_dict = db_dict
-        self.slot_error_prob = constants['emc']['slot_error_prob']
-        self.slot_error_mode = constants['emc']['slot_error_mode']  # [0, 3]
-        self.intent_error_prob = constants['emc']['intent_error_prob']
+        self.slot_error_prob = constants["emc"]["slot_error_prob"]
+        self.slot_error_mode = constants["emc"]["slot_error_mode"]  # [0, 3]
+        self.intent_error_prob = constants["emc"]["intent_error_prob"]
         self.intents = usersim_intents
 
     def infuse_error(self, frame):
@@ -35,8 +35,8 @@ class ErrorModelController:
                           'speaker': 'User')
         """
 
-        informs_dict = frame['inform_slots']
-        for key in list(frame['inform_slots'].keys()):
+        informs_dict = frame["inform_slots"]
+        for key in list(frame["inform_slots"].keys()):
             assert key in self.movie_dict
             if random.random() < self.slot_error_prob:
                 if self.slot_error_mode == 0:  # replace the slot_value only
@@ -54,7 +54,7 @@ class ErrorModelController:
                     else:
                         self._slot_remove(key, informs_dict)
         if random.random() < self.intent_error_prob:  # add noise for intent level
-            frame['intent'] = random.choice(self.intents)
+            frame["intent"] = random.choice(self.intents)
 
     def _slot_value_noise(self, key, informs_dict):
         """

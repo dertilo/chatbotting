@@ -12,7 +12,7 @@ class User:
         Parameters:
             constants (dict): Loaded constants as dict
         """
-        self.max_round = constants['run']['max_round_num']
+        self.max_round = constants["run"]["max_round_num"]
 
     def reset(self):
         """
@@ -38,34 +38,34 @@ class User:
             dict: The response of the user
         """
 
-        response = {'intent': '', 'inform_slots': {}, 'request_slots': {}}
+        response = {"intent": "", "inform_slots": {}, "request_slots": {}}
         while True:
-            input_string = input('Response: ')
-            chunks = input_string.split('/')
+            input_string = input("Response: ")
+            chunks = input_string.split("/")
 
             intent_correct = True
             if chunks[0] not in usersim_intents:
                 intent_correct = False
-            response['intent'] = chunks[0]
+            response["intent"] = chunks[0]
 
             informs_correct = True
             if len(chunks[1]) > 0:
-                informs_items_list = chunks[1].split(', ')
+                informs_items_list = chunks[1].split(", ")
                 for inf in informs_items_list:
-                    inf = inf.split(': ')
+                    inf = inf.split(": ")
                     if inf[0] not in all_slots:
                         informs_correct = False
                         break
-                    response['inform_slots'][inf[0]] = inf[1]
+                    response["inform_slots"][inf[0]] = inf[1]
 
             requests_correct = True
             if len(chunks[2]) > 0:
-                requests_key_list = chunks[2].split(', ')
+                requests_key_list = chunks[2].split(", ")
                 for req in requests_key_list:
                     if req not in all_slots:
                         requests_correct = False
                         break
-                    response['request_slots'][req] = 'UNK'
+                    response["request_slots"][req] = "UNK"
 
             if intent_correct and informs_correct and requests_correct:
                 break
@@ -82,7 +82,7 @@ class User:
 
         success = -2
         while success not in (-1, 0, 1):
-            success = int(input('Success?: '))
+            success = int(input("Success?: "))
         return success
 
     def step(self, agent_action):
@@ -101,23 +101,23 @@ class User:
 
         # Assertions ----
         # No unk in agent action informs
-        for value in agent_action['inform_slots'].values():
-            assert value != 'UNK'
-            assert value != 'PLACEHOLDER'
+        for value in agent_action["inform_slots"].values():
+            assert value != "UNK"
+            assert value != "PLACEHOLDER"
         # No PLACEHOLDER in agent_action at all
-        for value in agent_action['request_slots'].values():
-            assert value != 'PLACEHOLDER'
+        for value in agent_action["request_slots"].values():
+            assert value != "PLACEHOLDER"
         # ---------------
 
-        print('Agent Action: {}'.format(agent_action))
+        print("Agent Action: {}".format(agent_action))
 
         done = False
-        user_response = {'intent': '', 'request_slots': {}, 'inform_slots': {}}
+        user_response = {"intent": "", "request_slots": {}, "inform_slots": {}}
 
         # First check round num, if equal to max then fail
-        if agent_action['round'] == self.max_round:
+        if agent_action["round"] == self.max_round:
             success = FAIL
-            user_response['intent'] = 'done'
+            user_response["intent"] = "done"
         else:
             user_response = self._return_response()
             success = self._return_success()
@@ -125,8 +125,8 @@ class User:
         if success == FAIL or success == SUCCESS:
             done = True
 
-        assert 'UNK' not in user_response['inform_slots'].values()
-        assert 'PLACEHOLDER' not in user_response['request_slots'].values()
+        assert "UNK" not in user_response["inform_slots"].values()
+        assert "PLACEHOLDER" not in user_response["request_slots"].values()
 
         reward = reward_function(success, self.max_round)
 

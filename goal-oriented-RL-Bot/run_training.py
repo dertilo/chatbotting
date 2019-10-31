@@ -7,23 +7,23 @@ from utils import remove_empty_slots
 from user import User
 
 
-def get_params(params_json_file ='constants.json'):
+def get_params(params_json_file="constants.json"):
     global DATABASE_FILE_PATH, DICT_FILE_PATH, USER_GOALS_FILE_PATH, USE_USERSIM, NUM_EP_TRAIN, TRAIN_FREQ, SUCCESS_RATE_THRESHOLD
 
     with open(params_json_file) as f:
         constants = json.load(f)
 
-    file_path_dict = constants['db_file_paths']
-    DATABASE_FILE_PATH = file_path_dict['database']
-    DICT_FILE_PATH = file_path_dict['dict']
-    USER_GOALS_FILE_PATH = file_path_dict['user_goals']
+    file_path_dict = constants["db_file_paths"]
+    DATABASE_FILE_PATH = file_path_dict["database"]
+    DICT_FILE_PATH = file_path_dict["dict"]
+    USER_GOALS_FILE_PATH = file_path_dict["user_goals"]
     # Load run constants
-    run_dict = constants['run']
-    USE_USERSIM = run_dict['usersim']
-    NUM_EP_TRAIN = run_dict['num_ep_run']
-    TRAIN_FREQ = run_dict['train_freq']
-    MAX_ROUND_NUM = run_dict['max_round_num']
-    SUCCESS_RATE_THRESHOLD = run_dict['success_rate_threshold']
+    run_dict = constants["run"]
+    USE_USERSIM = run_dict["usersim"]
+    NUM_EP_TRAIN = run_dict["num_ep_run"]
+    TRAIN_FREQ = run_dict["train_freq"]
+    MAX_ROUND_NUM = run_dict["max_round_num"]
+    SUCCESS_RATE_THRESHOLD = run_dict["success_rate_threshold"]
     return constants
 
 
@@ -46,7 +46,7 @@ def run_round(state, warmup=False):
     return next_state, reward, done, success
 
 
-def warmup_run(dqn_agent:DQNAgent, state_tracker:StateTracker, num_warmup_steps:int):
+def warmup_run(dqn_agent: DQNAgent, state_tracker: StateTracker, num_warmup_steps: int):
     """
     Runs the warmup stage of training which is used to fill the agents memory.
 
@@ -55,7 +55,7 @@ def warmup_run(dqn_agent:DQNAgent, state_tracker:StateTracker, num_warmup_steps:
 
     """
 
-    print('Warmup Started...')
+    print("Warmup Started...")
     total_step = 0
     while total_step != num_warmup_steps and not dqn_agent.is_memory_full():
         # Reset episode
@@ -68,7 +68,7 @@ def warmup_run(dqn_agent:DQNAgent, state_tracker:StateTracker, num_warmup_steps:
             total_step += 1
             state = next_state
 
-    print('...Warmup Ended')
+    print("...Warmup Ended")
 
 
 def train_run():
@@ -80,7 +80,7 @@ def train_run():
 
     """
 
-    print('Training Started...')
+    print("Training Started...")
     episode = 0
     period_reward_total = 0
     period_success_total = 0
@@ -103,11 +103,18 @@ def train_run():
             success_rate = period_success_total / TRAIN_FREQ
             avg_reward = period_reward_total / TRAIN_FREQ
             # Flush
-            if success_rate >= success_rate_best and success_rate >= SUCCESS_RATE_THRESHOLD:
+            if (
+                success_rate >= success_rate_best
+                and success_rate >= SUCCESS_RATE_THRESHOLD
+            ):
                 dqn_agent.empty_memory()
             # Update current best success rate
             if success_rate > success_rate_best:
-                print('Episode: {} NEW BEST SUCCESS RATE: {} Avg Reward: {}' .format(episode, success_rate, avg_reward))
+                print(
+                    "Episode: {} NEW BEST SUCCESS RATE: {} Avg Reward: {}".format(
+                        episode, success_rate, avg_reward
+                    )
+                )
                 success_rate_best = success_rate
                 dqn_agent.save_weights()
             period_success_total = 0
@@ -116,7 +123,7 @@ def train_run():
             dqn_agent.copy()
             # Train
             dqn_agent.train()
-    print('...Training Ended')
+    print("...Training Ended")
 
 
 def episode_reset():
@@ -141,14 +148,14 @@ def episode_reset():
 
 if __name__ == "__main__":
     params = get_params()
-    train_params = params['run']
+    train_params = params["run"]
 
     # Note: If you get an unpickling error here then run 'pickle_converter.py' and it should fix it
-    database = pickle.load(open(DATABASE_FILE_PATH, 'rb'), encoding='latin1')
+    database = pickle.load(open(DATABASE_FILE_PATH, "rb"), encoding="latin1")
     remove_empty_slots(database)
 
-    db_dict = pickle.load(open(DICT_FILE_PATH, 'rb'), encoding='latin1')
-    user_goals = pickle.load(open(USER_GOALS_FILE_PATH, 'rb'), encoding='latin1')
+    db_dict = pickle.load(open(DICT_FILE_PATH, "rb"), encoding="latin1")
+    user_goals = pickle.load(open(USER_GOALS_FILE_PATH, "rb"), encoding="latin1")
 
     if USE_USERSIM:
         user = UserSimulator(user_goals, params, database)
@@ -158,6 +165,5 @@ if __name__ == "__main__":
     state_tracker = StateTracker(database, params)
     dqn_agent = DQNAgent(state_tracker.get_state_size(), params)
 
-
-    warmup_run(dqn_agent, state_tracker, train_params['warmup_mem'])
+    warmup_run(dqn_agent, state_tracker, train_params["warmup_mem"])
     train_run()

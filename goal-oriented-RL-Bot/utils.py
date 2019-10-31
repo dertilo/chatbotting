@@ -13,7 +13,7 @@ def convert_list_to_dict(lst):
     """
 
     if len(lst) > len(set(lst)):
-        raise ValueError('List must be unique!')
+        raise ValueError("List must be unique!")
     return {k: v for v, k in enumerate(lst)}
 
 
@@ -27,7 +27,7 @@ def remove_empty_slots(dic):
 
     for id in list(dic.keys()):
         for key in list(dic[id].keys()):
-            if dic[id][key] == '':
+            if dic[id][key] == "":
                 dic[id].pop(key)
 
 

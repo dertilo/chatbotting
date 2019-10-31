@@ -12,14 +12,14 @@ if __name__ == "__main__":
     # 1) In terminal: python test.py --constants_path "constants.json"
     # 2) Run this file as is
     parser = argparse.ArgumentParser()
-    parser.add_argument('--constants_path', dest='constants_path', type=str, default='')
+    parser.add_argument("--constants_path", dest="constants_path", type=str, default="")
     args = parser.parse_args()
     params = vars(args)
 
     # Load constants json into dict
-    CONSTANTS_FILE_PATH = 'constants.json'
-    if len(params['constants_path']) > 0:
-        constants_file = params['constants_path']
+    CONSTANTS_FILE_PATH = "constants.json"
+    if len(params["constants_path"]) > 0:
+        constants_file = params["constants_path"]
     else:
         constants_file = CONSTANTS_FILE_PATH
 
@@ -27,29 +27,29 @@ if __name__ == "__main__":
         constants = json.load(f)
 
     # Load file path constants
-    file_path_dict = constants['db_file_paths']
-    DATABASE_FILE_PATH = file_path_dict['database']
-    DICT_FILE_PATH = file_path_dict['dict']
-    USER_GOALS_FILE_PATH = file_path_dict['user_goals']
+    file_path_dict = constants["db_file_paths"]
+    DATABASE_FILE_PATH = file_path_dict["database"]
+    DICT_FILE_PATH = file_path_dict["dict"]
+    USER_GOALS_FILE_PATH = file_path_dict["user_goals"]
 
     # Load run constants
-    run_dict = constants['run']
-    USE_USERSIM = run_dict['usersim']
-    NUM_EP_TEST = run_dict['num_ep_run']
-    MAX_ROUND_NUM = run_dict['max_round_num']
+    run_dict = constants["run"]
+    USE_USERSIM = run_dict["usersim"]
+    NUM_EP_TEST = run_dict["num_ep_run"]
+    MAX_ROUND_NUM = run_dict["max_round_num"]
 
     # Load movie DB
     # Note: If you get an unpickling error here then run 'pickle_converter.py' and it should fix it
-    database = pickle.load(open(DATABASE_FILE_PATH, 'rb'), encoding='latin1')
+    database = pickle.load(open(DATABASE_FILE_PATH, "rb"), encoding="latin1")
 
     # Clean DB
     remove_empty_slots(database)
 
     # Load movie dict
-    db_dict = pickle.load(open(DICT_FILE_PATH, 'rb'), encoding='latin1')
+    db_dict = pickle.load(open(DICT_FILE_PATH, "rb"), encoding="latin1")
 
     # Load goal file
-    user_goals = pickle.load(open(USER_GOALS_FILE_PATH, 'rb'), encoding='latin1')
+    user_goals = pickle.load(open(USER_GOALS_FILE_PATH, "rb"), encoding="latin1")
 
     # Init. Objects
     if USE_USERSIM:
@@ -70,7 +70,7 @@ def test_run():
 
     """
 
-    print('Testing Started...')
+    print("Testing Started...")
     episode = 0
     while episode < NUM_EP_TEST:
         episode_reset()
@@ -94,8 +94,8 @@ def test_run():
             state_tracker.update_state_user(user_action)
             # Grab "next state" as state
             state = state_tracker.get_state(done)
-        print('Episode: {} Success: {} Reward: {}'.format(episode, success, ep_reward))
-    print('...Testing Ended')
+        print("Episode: {} Success: {} Reward: {}".format(episode, success, ep_reward))
+    print("...Testing Ended")
 
 
 def episode_reset():
