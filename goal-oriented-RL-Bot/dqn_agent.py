@@ -293,8 +293,7 @@ class DQNAgent:
 
             self.beh_model.fit(inputs, targets, epochs=1, verbose=0)
 
-    def copy(self):
-        """Copies the behavior model's weights into the target model's weights."""
+    def update_target_model_weights(self):
 
         self.tar_model.set_weights(self.beh_model.get_weights())
 

@@ -84,7 +84,7 @@ def run_train(train_params):
         period_success_total += int(success)
 
         if episode_counter % TRAIN_INTERVAL == 0:
-            success_rate_best = handle_successfulness(
+            flushed_agent_memory, success_rate_best = handle_successfulness(
                 SUCCESS_RATE_THRESHOLD,
                 TRAIN_INTERVAL,
                 episode_counter,
@@ -94,8 +94,9 @@ def run_train(train_params):
             )
             period_success_total = 0
             period_reward_total = 0
-            dqn_agent.copy() #TODO(tilo): why?
-            dqn_agent.train()
+            dqn_agent.update_target_model_weights()
+            if not flushed_agent_memory:
+                dqn_agent.train()
     print("...Training Ended")
 
 
@@ -109,11 +110,25 @@ def handle_successfulness(
 ):
     success_rate = period_success_total / TRAIN_INTERVAL
     avg_reward = period_reward_total / TRAIN_INTERVAL
-    if success_rate >= success_rate_best and success_rate >= SUCCESS_RATE_THRESHOLD:
+    is_new_highscore = success_rate > success_rate_best
+    # flushed_agent_memory = False
+    """
+    If the success rate of that period is greater than or equal to the 
+    current best success rate (initialized to 0.0 at the start of 
+    train_run()) AND it is higher than some SUCCESS_RATE_THRESHOLD, 
+    then the agent’s memory is emptied. This is to get rid of older 
+    experiences that are based on actions of the previous version of the agent’s 
+    model i.e. actions that were taken by a less optimal model. 
+    This then allows newer experiences from the better version of the model to 
+    fill the memory. This way the training and performance is stabilized.
+    """
+    flushed_agent_memory = (
+            is_new_highscore and success_rate >= SUCCESS_RATE_THRESHOLD
+    )
+    if flushed_agent_memory:
         dqn_agent.empty_memory()
 
-    # Update current best success rate
-    if success_rate > success_rate_best:
+    if is_new_highscore:
         print(
             "Episode: {} NEW BEST SUCCESS RATE: {} Avg Reward: {}".format(
                 episode_counter, success_rate, avg_reward
@@ -121,7 +136,7 @@ def handle_successfulness(
         )
         success_rate_best = success_rate
         dqn_agent.save_weights()
-    return success_rate_best
+    return flushed_agent_memory, success_rate_best
 
 
 def episode_reset(
