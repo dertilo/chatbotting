@@ -1,12 +1,14 @@
-import random, copy
-from dialogue_config import RULE_REQUESTS, agent_actions
+import random
+from dialogue_config import RULE_REQUESTS, AGENT_ACTIONS, map_action_to_index, \
+    map_index_to_action
+
 
 class RuleBasedAgent:
 
     def __init__(self, eps):
 
         self.eps = eps
-        self.possible_actions = agent_actions
+        self.possible_actions = AGENT_ACTIONS
         self.num_actions = len(self.possible_actions)
         self.reset_rulebased_vars()
 
@@ -19,7 +21,7 @@ class RuleBasedAgent:
 
         if self.eps > random.random():
             index = random.randint(0, self.num_actions - 1)
-            action = self._map_index_to_action(index)
+            action = map_index_to_action(index)
             return index, action
         else:
             return self._rule_action()
@@ -46,20 +48,5 @@ class RuleBasedAgent:
         else:
             raise Exception("Should not have reached this clause")
 
-        index = self._map_action_to_index(rule_response)
+        index = map_action_to_index(rule_response)
         return index, rule_response
-
-    def _map_action_to_index(self, response):
-
-        for (i, action) in enumerate(self.possible_actions):
-            if response == action:
-                return i
-        raise ValueError("Response: {} not found in possible actions".format(response))
-
-
-    def _map_index_to_action(self, index):
-
-        for (i, action) in enumerate(self.possible_actions):
-            if index == i:
-                return copy.deepcopy(action)
-        raise ValueError("Index: {} not in range of possible actions".format(index))

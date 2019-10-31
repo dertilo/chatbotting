@@ -1,5 +1,7 @@
 # Special slot values (for reference)
 "PLACEHOLDER"  # For informs
+import copy
+
 "UNK"  # For requests
 "anything"  # means any value works for the slot with this value
 "no match available"  # When the intent of the agent is match_found yet no db match fits current constraints
@@ -65,7 +67,7 @@ agent_request_slots = [
 ]
 
 # Possible actions for agent
-agent_actions = [
+AGENT_ACTIONS = [
     {
         "intent": "done",
         "inform_slots": {},
@@ -77,11 +79,11 @@ for slot in agent_inform_slots:
     # Must use intent match found to inform this, but still have to keep in agent inform slots
     if slot == usersim_default_key:
         continue
-    agent_actions.append(
+    AGENT_ACTIONS.append(
         {"intent": "inform", "inform_slots": {slot: "PLACEHOLDER"}, "request_slots": {}}
     )
 for slot in agent_request_slots:
-    agent_actions.append(
+    AGENT_ACTIONS.append(
         {"intent": "request", "inform_slots": {}, "request_slots": {slot: "UNK"}}
     )
 
@@ -133,3 +135,17 @@ all_slots = [
     usersim_default_key,
     "mc_list",
 ]
+
+
+def map_action_to_index(response):
+    for (i, action) in enumerate(AGENT_ACTIONS):
+        if response == action:
+            return i
+    raise ValueError("Response: {} not found in possible actions".format(response))
+
+
+def map_index_to_action(index):
+    for (i, action) in enumerate(AGENT_ACTIONS):
+        if index == i:
+            return copy.deepcopy(action)
+    raise ValueError("Index: {} not in range of possible actions".format(index))

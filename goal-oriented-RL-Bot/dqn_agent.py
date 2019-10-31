@@ -5,7 +5,7 @@ import random, copy
 import numpy as np
 
 from Experience import Experience
-from dialogue_config import agent_actions
+from dialogue_config import AGENT_ACTIONS, map_index_to_action
 import re
 
 
@@ -29,7 +29,7 @@ class DQNAgent:
         self.save_weights_file_path = self.C["save_weights_file_path"]
 
         self.state_size = state_size
-        self.possible_actions = agent_actions
+        self.possible_actions = AGENT_ACTIONS
         self.num_actions = len(self.possible_actions)
 
         self.beh_model = self._build_model()
@@ -48,58 +48,11 @@ class DQNAgent:
 
         if self.eps > random.random():
             index = random.randint(0, self.num_actions - 1)
-            action = self._map_index_to_action(index)
-            return index, action
         else:
-            return self._dqn_action(state)
+            index = np.argmax(self._dqn_predict_one(state))
 
-    def _map_action_to_index(self, response):
-        """
-        Maps an action to an index from possible actions.
-
-        Parameters:
-            response (dict)
-
-        Returns:
-            int
-        """
-
-        for (i, action) in enumerate(self.possible_actions):
-            if response == action:
-                return i
-        raise ValueError("Response: {} not found in possible actions".format(response))
-
-    def _dqn_action(self, state):
-        """
-        Returns a behavior model output given a state.
-
-        Parameters:
-            state (numpy.array)
-
-        Returns:
-            int: The index of the action in the possible actions
-            dict: The action/response itself
-        """
-
-        index = np.argmax(self._dqn_predict_one(state))
-        action = self._map_index_to_action(index)
-        return index, action
-
-    def _map_index_to_action(self, index):
-        """
-        Maps an index to an action in possible actions.
-
-        Parameters:
-            index (int)
-
-        Returns:
-            dict
-        """
-
-        for (i, action) in enumerate(self.possible_actions):
-            if index == i:
-                return copy.deepcopy(action)
-        raise ValueError("Index: {} not in range of possible actions".format(index))
+        action = map_index_to_action(index)
+        return index,action
 
     def _dqn_predict_one(self, state, target=False):
         """
