@@ -7,61 +7,24 @@ from utils import remove_empty_slots
 from user import User
 
 
-if __name__ == "__main__":
-    # Can provide constants file path in args OR run it as is and change 'CONSTANTS_FILE_PATH' below
-    # 1) In terminal: python train.py --constants_path "constants.json"
-    # 2) Run this file as is
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--constants_path', dest='constants_path', type=str, default='')
-    args = parser.parse_args()
-    params = vars(args)
+def get_params(params_json_file ='constants.json'):
+    global DATABASE_FILE_PATH, DICT_FILE_PATH, USER_GOALS_FILE_PATH, USE_USERSIM, NUM_EP_TRAIN, TRAIN_FREQ, SUCCESS_RATE_THRESHOLD
 
-    # Load constants json into dict
-    CONSTANTS_FILE_PATH = 'constants.json'
-    if len(params['constants_path']) > 0:
-        constants_file = params['constants_path']
-    else:
-        constants_file = CONSTANTS_FILE_PATH
-
-    with open(constants_file) as f:
+    with open(params_json_file) as f:
         constants = json.load(f)
 
-    # Load file path constants
     file_path_dict = constants['db_file_paths']
     DATABASE_FILE_PATH = file_path_dict['database']
     DICT_FILE_PATH = file_path_dict['dict']
     USER_GOALS_FILE_PATH = file_path_dict['user_goals']
-
     # Load run constants
     run_dict = constants['run']
     USE_USERSIM = run_dict['usersim']
-    WARMUP_MEM = run_dict['warmup_mem']
     NUM_EP_TRAIN = run_dict['num_ep_run']
     TRAIN_FREQ = run_dict['train_freq']
     MAX_ROUND_NUM = run_dict['max_round_num']
     SUCCESS_RATE_THRESHOLD = run_dict['success_rate_threshold']
-
-    # Load movie DB
-    # Note: If you get an unpickling error here then run 'pickle_converter.py' and it should fix it
-    database = pickle.load(open(DATABASE_FILE_PATH, 'rb'), encoding='latin1')
-
-    # Clean DB
-    remove_empty_slots(database)
-
-    # Load movie dict
-    db_dict = pickle.load(open(DICT_FILE_PATH, 'rb'), encoding='latin1')
-
-    # Load goal File
-    user_goals = pickle.load(open(USER_GOALS_FILE_PATH, 'rb'), encoding='latin1')
-
-    # Init. Objects
-    if USE_USERSIM:
-        user = UserSimulator(user_goals, constants, database)
-    else:
-        user = User(constants)
-    emc = ErrorModelController(db_dict, constants)
-    state_tracker = StateTracker(database, constants)
-    dqn_agent = DQNAgent(state_tracker.get_state_size(), constants)
+    return constants
 
 
 def run_round(state, warmup=False):
@@ -83,7 +46,7 @@ def run_round(state, warmup=False):
     return next_state, reward, done, success
 
 
-def warmup_run():
+def warmup_run(dqn_agent:DQNAgent, state_tracker:StateTracker, num_warmup_steps:int):
     """
     Runs the warmup stage of training which is used to fill the agents memory.
 
@@ -94,7 +57,7 @@ def warmup_run():
 
     print('Warmup Started...')
     total_step = 0
-    while total_step != WARMUP_MEM and not dqn_agent.is_memory_full():
+    while total_step != num_warmup_steps and not dqn_agent.is_memory_full():
         # Reset episode
         episode_reset()
         done = False
@@ -176,5 +139,25 @@ def episode_reset():
     dqn_agent.reset()
 
 
-warmup_run()
-train_run()
+if __name__ == "__main__":
+    params = get_params()
+    train_params = params['run']
+
+    # Note: If you get an unpickling error here then run 'pickle_converter.py' and it should fix it
+    database = pickle.load(open(DATABASE_FILE_PATH, 'rb'), encoding='latin1')
+    remove_empty_slots(database)
+
+    db_dict = pickle.load(open(DICT_FILE_PATH, 'rb'), encoding='latin1')
+    user_goals = pickle.load(open(USER_GOALS_FILE_PATH, 'rb'), encoding='latin1')
+
+    if USE_USERSIM:
+        user = UserSimulator(user_goals, params, database)
+    else:
+        user = User(params)
+    emc = ErrorModelController(db_dict, params)
+    state_tracker = StateTracker(database, params)
+    dqn_agent = DQNAgent(state_tracker.get_state_size(), params)
+
+
+    warmup_run(dqn_agent, state_tracker, train_params['warmup_mem'])
+    train_run()
