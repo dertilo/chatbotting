@@ -45,13 +45,13 @@ def warmup_run(dqn_agent: DQNAgent, state_tracker: StateTracker, num_warmup_step
     print("Warmup Started...")
     total_step = 0
     while total_step != num_warmup_steps and not dqn_agent.is_memory_full():
-        num_steps, _, _ = run_dialog_episode(dqn_agent, state_tracker,warmup=True)
+        num_steps, _, _ = run_dialog_episode(dqn_agent, state_tracker, warmup=True)
         total_step += num_steps
 
     print("...Warmup Ended")
 
 
-def run_dialog_episode(dqn_agent, state_tracker, num_max_steps=30,warmup=False):
+def run_dialog_episode(dqn_agent, state_tracker, num_max_steps=30, warmup=False):
     episode_reset(state_tracker, user, emc, dqn_agent)
     state = state_tracker.get_state()
     turn = 0
@@ -77,27 +77,57 @@ def run_train(train_params):
     period_reward_total = 0
     period_success_total = 0
     success_rate_best = 0.0
-    for episode_counter in tqdm(range(NUM_EP_TRAIN)):
 
-        num_turns, dialog_reward, success = run_dialog_episode(dqn_agent, state_tracker)
-        period_reward_total += dialog_reward
-        period_success_total += int(success)
+    params_to_monitor = {"dialogue": 0, "success-rate": 0.0, "avg-reward": 0.0}
+    running_factor = 0.9
+    with tqdm(postfix=[params_to_monitor]) as pbar:
 
-        if episode_counter % TRAIN_INTERVAL == 0:
-            flushed_agent_memory, success_rate_best = handle_successfulness(
-                SUCCESS_RATE_THRESHOLD,
-                TRAIN_INTERVAL,
-                episode_counter,
-                period_reward_total,
-                period_success_total,
-                success_rate_best,
+        for dialog_counter in range(NUM_EP_TRAIN):
+
+            num_turns, dialog_reward, success = run_dialog_episode(
+                dqn_agent, state_tracker
             )
-            period_success_total = 0
-            period_reward_total = 0
-            dqn_agent.update_target_model_weights()
-            if not flushed_agent_memory:
-                dqn_agent.train()
+            period_reward_total += dialog_reward
+            period_success_total += int(success)
+
+            if dialog_counter % TRAIN_INTERVAL == 0:
+                flushed_agent_memory, success_rate_best = handle_successfulness(
+                    SUCCESS_RATE_THRESHOLD,
+                    TRAIN_INTERVAL,
+                    dialog_counter,
+                    period_reward_total,
+                    period_success_total,
+                    success_rate_best,
+                )
+                period_success_total = 0
+                period_reward_total = 0
+                dqn_agent.update_target_model_weights()
+                if not flushed_agent_memory:
+                    dqn_agent.train()
+
+                success_rate = period_success_total / TRAIN_INTERVAL
+                avg_reward = period_reward_total / TRAIN_INTERVAL
+
+                update_progess_bar(
+                    avg_reward, dialog_counter, pbar, running_factor, success_rate
+                )
+
     print("...Training Ended")
+
+
+def update_progess_bar(pbar, dialog_counter, avg_reward, running_factor, success_rate):
+    pbar.postfix[0]["dialogue"] = dialog_counter
+    pbar.postfix[0]["success-rate"] = round(
+        running_factor * pbar.postfix[0]["success-rate"]
+        + (1 - running_factor) * success_rate,
+        2,
+    )
+    pbar.postfix[0]["avg-reward"] = round(
+        running_factor * pbar.postfix[0]["avg-reward"]
+        + (1 - running_factor) * avg_reward,
+        2,
+    )
+    pbar.update()
 
 
 def handle_successfulness(
@@ -111,7 +141,7 @@ def handle_successfulness(
     success_rate = period_success_total / TRAIN_INTERVAL
     avg_reward = period_reward_total / TRAIN_INTERVAL
     is_new_highscore = success_rate > success_rate_best
-    # flushed_agent_memory = False
+    flushed_agent_memory = False
     """
     If the success rate of that period is greater than or equal to the 
     current best success rate (initialized to 0.0 at the start of 
@@ -122,11 +152,11 @@ def handle_successfulness(
     This then allows newer experiences from the better version of the model to 
     fill the memory. This way the training and performance is stabilized.
     """
-    flushed_agent_memory = (
-            is_new_highscore and success_rate >= SUCCESS_RATE_THRESHOLD
-    )
-    if flushed_agent_memory:
-        dqn_agent.empty_memory()
+    # flushed_agent_memory = (
+    #         is_new_highscore and success_rate >= SUCCESS_RATE_THRESHOLD
+    # )
+    # if flushed_agent_memory:
+    #     dqn_agent.empty_memory()
 
     if is_new_highscore:
         print(
