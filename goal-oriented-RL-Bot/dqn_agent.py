@@ -3,7 +3,9 @@ from keras.layers import Dense
 from keras.optimizers import Adam
 import random, copy
 import numpy as np
-from dialogue_config import rule_requests, agent_actions
+
+from Experience import Experience
+from dialogue_config import agent_actions
 import re
 
 
@@ -16,9 +18,6 @@ class DQNAgent:
     def __init__(self, state_size, constants):
 
         self.C = constants["agent"]
-        self.memory = []
-        self.memory_index = 0
-        self.max_memory_size = self.C["max_mem_size"]
         self.eps = self.C["epsilon_init"]
         self.vanilla = self.C["vanilla"]
         self.lr = self.C["learning_rate"]
@@ -29,96 +28,30 @@ class DQNAgent:
         self.load_weights_file_path = self.C["load_weights_file_path"]
         self.save_weights_file_path = self.C["save_weights_file_path"]
 
-        if self.max_memory_size < self.batch_size:
-            raise ValueError("Max memory size must be at least as great as batch size!")
-
         self.state_size = state_size
         self.possible_actions = agent_actions
         self.num_actions = len(self.possible_actions)
-
-        self.rule_request_set = rule_requests
 
         self.beh_model = self._build_model()
         self.tar_model = self._build_model()
 
         self._load_weights()
 
-        self.reset_rulebased_vars()
-
     def _build_model(self):
-
         model = Sequential()
         model.add(Dense(self.hidden_size, input_dim=self.state_size, activation="relu"))
         model.add(Dense(self.num_actions, activation="linear"))
         model.compile(loss="mse", optimizer=Adam(lr=self.lr))
         return model
 
-    def reset_rulebased_vars(self):
-        self.rule_current_slot_index = 0
-        self.rule_phase = "not done"
-
-    def get_action(self, state, use_rule=False):
-        """
-        Returns the action of the agent given a state.
-
-        Gets the action of the agent given the current state. Either the rule-based policy or the neural networks are
-        used to respond.
-
-        Parameters:
-            state (numpy.array): The database with format dict(long: dict)
-            use_rule (bool): Indicates whether or not to use the rule-based policy, which depends on if this was called
-                             in warmup or training. Default: False
-
-        Returns:
-            int: The index of the action in the possible actions
-            dict: The action/response itself
-
-        """
+    def get_action(self, state):
 
         if self.eps > random.random():
             index = random.randint(0, self.num_actions - 1)
             action = self._map_index_to_action(index)
             return index, action
         else:
-            if use_rule:
-                return self._rule_action()
-            else:
-                return self._dqn_action(state)
-
-    def _rule_action(self):
-        """
-        Returns a rule-based policy action.
-
-        Selects the next action of a simple rule-based policy.
-
-        Returns:
-            int: The index of the action in the possible actions
-            dict: The action/response itself
-
-        """
-
-        if self.rule_current_slot_index < len(self.rule_request_set):
-            slot = self.rule_request_set[self.rule_current_slot_index]
-            self.rule_current_slot_index += 1
-            rule_response = {
-                "intent": "request",
-                "inform_slots": {},
-                "request_slots": {slot: "UNK"},
-            }
-        elif self.rule_phase == "not done":
-            rule_response = {
-                "intent": "match_found",
-                "inform_slots": {},
-                "request_slots": {},
-            }
-            self.rule_phase = "done"
-        elif self.rule_phase == "done":
-            rule_response = {"intent": "done", "inform_slots": {}, "request_slots": {}}
-        else:
-            raise Exception("Should not have reached this clause")
-
-        index = self._map_action_to_index(rule_response)
-        return index, rule_response
+            return self._dqn_action(state)
 
     def _map_action_to_index(self, response):
         """
@@ -201,36 +134,7 @@ class DQNAgent:
         else:
             return self.beh_model.predict(states)
 
-    def add_experience(self, state, action, reward, next_state, done):
-        """
-        Adds an experience tuple made of the parameters to the memory.
-
-        Parameters:
-            state (numpy.array)
-            action (int)
-            reward (int)
-            next_state (numpy.array)
-            done (bool)
-
-        """
-
-        if len(self.memory) < self.max_memory_size:
-            self.memory.append(None)
-        self.memory[self.memory_index] = (state, action, reward, next_state, done)
-        self.memory_index = (self.memory_index + 1) % self.max_memory_size
-
-    def empty_memory(self):
-        """Empties the memory and resets the memory index."""
-
-        self.memory = []
-        self.memory_index = 0
-
-    def is_memory_full(self):
-        """Returns true if the memory is full."""
-
-        return len(self.memory) == self.max_memory_size
-
-    def train(self):
+    def train(self,experience:Experience):
         """
         Trains the agent by improving the behavior model given the memory tuples.
 
@@ -240,9 +144,9 @@ class DQNAgent:
         """
 
         # Calc. num of batches to run
-        num_batches = len(self.memory) // self.batch_size
+        num_batches = len(experience.memory) // self.batch_size
         for b in range(num_batches):
-            batch = random.sample(self.memory, self.batch_size)
+            batch = random.sample(experience.memory, self.batch_size)
 
             states = np.array([sample[0] for sample in batch])
             next_states = np.array([sample[3] for sample in batch])

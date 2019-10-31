@@ -86,7 +86,7 @@ for slot in agent_request_slots:
     )
 
 # Rule-based policy request list
-rule_requests = ["moviename", "starttime", "city", "date", "theater", "numberofpeople"]
+RULE_REQUESTS = ["moviename", "starttime", "city", "date", "theater", "numberofpeople"]
 
 # These are possible inform slot keys that cannot be used to query
 no_query_keys = ["numberofpeople", usersim_default_key]
