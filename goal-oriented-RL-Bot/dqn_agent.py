@@ -12,19 +12,8 @@ import re
 
 
 class DQNAgent:
-    """The DQN agent that interacts with the user."""
 
     def __init__(self, state_size, constants):
-        """
-        The constructor of DQNAgent.
-
-        The constructor of DQNAgent which saves constants, sets up neural network graphs, etc.
-
-        Parameters:
-            state_size (int): The state representation size or length of numpy array
-            constants (dict): Loaded constants in dict
-
-        """
 
         self.C = constants["agent"]
         self.memory = []
@@ -54,10 +43,9 @@ class DQNAgent:
 
         self._load_weights()
 
-        self.reset()
+        self.reset_rulebased_vars()
 
     def _build_model(self):
-        """Builds and returns model/graph of neural network."""
 
         model = Sequential()
         model.add(Dense(self.hidden_size, input_dim=self.state_size, activation="relu"))
@@ -65,9 +53,7 @@ class DQNAgent:
         model.compile(loss="mse", optimizer=Adam(lr=self.lr))
         return model
 
-    def reset(self):
-        """Resets the rule-based variables."""
-
+    def reset_rulebased_vars(self):
         self.rule_current_slot_index = 0
         self.rule_phase = "not done"
 

@@ -110,7 +110,7 @@ def episode_reset():
     # And update state tracker
     state_tracker.update_state_user(user_action)
     # Finally, reset agent
-    dqn_agent.reset()
+    dqn_agent.reset_rulebased_vars()
 
 
 test_run()
