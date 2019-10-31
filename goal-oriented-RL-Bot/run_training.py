@@ -27,19 +27,17 @@ def get_params(params_json_file="constants.json"):
     return constants
 
 
-def run_round(state, warmup=False):
-    # 1) Agent takes action given state tracker's representation of dialogue (state)
+def one_round_agent_user_action_collect_experience(
+    dqn_agent: DQNAgent, state_tracker: StateTracker, state, warmup=False
+):
+
     agent_action_index, agent_action = dqn_agent.get_action(state, use_rule=warmup)
-    # 2) Update state tracker with the agent's action
     state_tracker.update_state_agent(agent_action)
-    # 3) User takes action given agent action
     user_action, reward, done, success = user.step(agent_action)
     if not done:
-        # 4) Infuse error into semantic frame level of user action
         emc.infuse_error(user_action)
-    # 5) Update state tracker with user action
+
     state_tracker.update_state_user(user_action)
-    # 6) Get next state and add experience
     next_state = state_tracker.get_state(done)
     dqn_agent.add_experience(state, agent_action_index, reward, next_state, done)
 
@@ -47,28 +45,28 @@ def run_round(state, warmup=False):
 
 
 def warmup_run(dqn_agent: DQNAgent, state_tracker: StateTracker, num_warmup_steps: int):
-    """
-    Runs the warmup stage of training which is used to fill the agents memory.
-
-    The agent uses it's rule-based policy to make actions. The agent's memory is filled as this runs.
-    Loop terminates when the size of the memory is equal to WARMUP_MEM or when the memory buffer is full.
-
-    """
 
     print("Warmup Started...")
     total_step = 0
     while total_step != num_warmup_steps and not dqn_agent.is_memory_full():
-        # Reset episode
-        episode_reset()
-        done = False
-        # Get initial state from state tracker
-        state = state_tracker.get_state()
-        while not done:
-            next_state, _, done, _ = run_round(state, warmup=True)
-            total_step += 1
-            state = next_state
+        num_steps = run_dialog_episode(dqn_agent, state_tracker)
+        total_step += num_steps
 
     print("...Warmup Ended")
+
+
+def run_dialog_episode(dqn_agent, state_tracker, num_max_steps=30):
+    episode_reset(state_tracker, user, emc, dqn_agent)
+    state = state_tracker.get_state()
+    step = 0
+    for step in range(1, num_max_steps + 1):
+        next_state, _, done, _ = one_round_agent_user_action_collect_experience(
+            dqn_agent, state_tracker, state, warmup=True
+        )
+        state = next_state
+        if done:
+            break
+    return step
 
 
 def train_run():
@@ -86,12 +84,14 @@ def train_run():
     period_success_total = 0
     success_rate_best = 0.0
     while episode < NUM_EP_TRAIN:
-        episode_reset()
+        episode_reset(state_tracker, user, emc, dqn_agent)
         episode += 1
         done = False
         state = state_tracker.get_state()
         while not done:
-            next_state, reward, done, success = run_round(state)
+            next_state, reward, done, success = one_round_agent_user_action_collect_experience(
+                dqn_agent,state_tracker,state
+            )
             period_reward_total += reward
             state = next_state
 
@@ -126,23 +126,16 @@ def train_run():
     print("...Training Ended")
 
 
-def episode_reset():
-    """
-    Resets the episode/conversation in the warmup and training loops.
-
-    Called in warmup and train to reset the state tracker, user and agent. Also get's the initial user action.
-
-    """
-
-    # First reset the state tracker
+def episode_reset(
+    state_tracker: StateTracker,
+    user: UserSimulator,
+    emc: ErrorModelController,
+    dqn_agent: DQNAgent,
+):
     state_tracker.reset()
-    # Then pick an init user action
-    user_action = user.reset()
-    # Infuse with error
-    emc.infuse_error(user_action)
-    # And update state tracker
-    state_tracker.update_state_user(user_action)
-    # Finally, reset agent
+    init_user_action = user.reset()
+    emc.infuse_error(init_user_action)
+    state_tracker.update_state_user(init_user_action)
     dqn_agent.reset()
 
 
@@ -156,11 +149,8 @@ if __name__ == "__main__":
 
     db_dict = pickle.load(open(DICT_FILE_PATH, "rb"), encoding="latin1")
     user_goals = pickle.load(open(USER_GOALS_FILE_PATH, "rb"), encoding="latin1")
+    user = UserSimulator(user_goals, params, database)
 
-    if USE_USERSIM:
-        user = UserSimulator(user_goals, params, database)
-    else:
-        user = User(params)
     emc = ErrorModelController(db_dict, params)
     state_tracker = StateTracker(database, params)
     dqn_agent = DQNAgent(state_tracker.get_state_size(), params)
