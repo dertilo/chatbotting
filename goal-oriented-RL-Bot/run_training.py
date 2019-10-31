@@ -1,3 +1,5 @@
+from tqdm import tqdm
+
 from user_simulator import UserSimulator
 from error_model_controller import ErrorModelController
 from dqn_agent import DQNAgent
@@ -43,20 +45,20 @@ def warmup_run(dqn_agent: DQNAgent, state_tracker: StateTracker, num_warmup_step
     print("Warmup Started...")
     total_step = 0
     while total_step != num_warmup_steps and not dqn_agent.is_memory_full():
-        num_steps, _, _ = run_dialog_episode(dqn_agent, state_tracker)
+        num_steps, _, _ = run_dialog_episode(dqn_agent, state_tracker,warmup=True)
         total_step += num_steps
 
     print("...Warmup Ended")
 
 
-def run_dialog_episode(dqn_agent, state_tracker, num_max_steps=30):
+def run_dialog_episode(dqn_agent, state_tracker, num_max_steps=30,warmup=False):
     episode_reset(state_tracker, user, emc, dqn_agent)
     state = state_tracker.get_state()
     turn = 0
     reward_sum = 0
     for turn in range(1, num_max_steps + 1):
         next_state, reward, done, success = one_round_agent_user_action_collect_experience(
-            dqn_agent, state_tracker, state, warmup=True
+            dqn_agent, state_tracker, state, warmup=warmup
         )
         state = next_state
         reward_sum += reward
@@ -72,12 +74,10 @@ def run_train(train_params):
     SUCCESS_RATE_THRESHOLD = train_params["success_rate_threshold"]
 
     print("Training Started...")
-    episode_counter = 0
     period_reward_total = 0
     period_success_total = 0
     success_rate_best = 0.0
-    while episode_counter < NUM_EP_TRAIN:
-        episode_counter += 1
+    for episode_counter in tqdm(range(NUM_EP_TRAIN)):
 
         num_turns, dialog_reward, success = run_dialog_episode(dqn_agent, state_tracker)
         period_reward_total += dialog_reward
@@ -149,7 +149,7 @@ def episode_reset(
     init_user_action = user.reset()
     emc.infuse_error(init_user_action)
     state_tracker.update_state_user(init_user_action)
-    dqn_agent.reset()
+    dqn_agent.reset_rulebased_vars()
 
 
 if __name__ == "__main__":
