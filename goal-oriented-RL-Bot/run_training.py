@@ -8,7 +8,7 @@ from user import User
 
 
 def get_params(params_json_file="constants.json"):
-    global DATABASE_FILE_PATH, DICT_FILE_PATH, USER_GOALS_FILE_PATH, USE_USERSIM, NUM_EP_TRAIN, TRAIN_FREQ, SUCCESS_RATE_THRESHOLD
+    global DATABASE_FILE_PATH, DICT_FILE_PATH, USER_GOALS_FILE_PATH, USE_USERSIM, NUM_EP_TRAIN, TRAIN_INTERVAL, SUCCESS_RATE_THRESHOLD
 
     with open(params_json_file) as f:
         constants = json.load(f)
@@ -18,12 +18,6 @@ def get_params(params_json_file="constants.json"):
     DICT_FILE_PATH = file_path_dict["dict"]
     USER_GOALS_FILE_PATH = file_path_dict["user_goals"]
     # Load run constants
-    run_dict = constants["run"]
-    USE_USERSIM = run_dict["usersim"]
-    NUM_EP_TRAIN = run_dict["num_ep_run"]
-    TRAIN_FREQ = run_dict["train_freq"]
-    MAX_ROUND_NUM = run_dict["max_round_num"]
-    SUCCESS_RATE_THRESHOLD = run_dict["success_rate_threshold"]
     return constants
 
 
@@ -49,7 +43,7 @@ def warmup_run(dqn_agent: DQNAgent, state_tracker: StateTracker, num_warmup_step
     print("Warmup Started...")
     total_step = 0
     while total_step != num_warmup_steps and not dqn_agent.is_memory_full():
-        num_steps = run_dialog_episode(dqn_agent, state_tracker)
+        num_steps, _, _ = run_dialog_episode(dqn_agent, state_tracker)
         total_step += num_steps
 
     print("...Warmup Ended")
@@ -58,72 +52,76 @@ def warmup_run(dqn_agent: DQNAgent, state_tracker: StateTracker, num_warmup_step
 def run_dialog_episode(dqn_agent, state_tracker, num_max_steps=30):
     episode_reset(state_tracker, user, emc, dqn_agent)
     state = state_tracker.get_state()
-    step = 0
-    for step in range(1, num_max_steps + 1):
-        next_state, _, done, _ = one_round_agent_user_action_collect_experience(
+    turn = 0
+    reward_sum = 0
+    for turn in range(1, num_max_steps + 1):
+        next_state, reward, done, success = one_round_agent_user_action_collect_experience(
             dqn_agent, state_tracker, state, warmup=True
         )
         state = next_state
+        reward_sum += reward
         if done:
             break
-    return step
+    return turn, reward_sum, success
 
 
-def train_run():
-    """
-    Runs the loop that trains the agent.
+def run_train(train_params):
 
-    Trains the agent on the goal-oriented chatbot task. Training of the agent's neural network occurs every episode that
-    TRAIN_FREQ is a multiple of. Terminates when the episode reaches NUM_EP_TRAIN.
-
-    """
+    NUM_EP_TRAIN = train_params["num_ep_run"]
+    TRAIN_INTERVAL = train_params["train_freq"]
+    SUCCESS_RATE_THRESHOLD = train_params["success_rate_threshold"]
 
     print("Training Started...")
-    episode = 0
+    episode_counter = 0
     period_reward_total = 0
     period_success_total = 0
     success_rate_best = 0.0
-    while episode < NUM_EP_TRAIN:
-        episode_reset(state_tracker, user, emc, dqn_agent)
-        episode += 1
-        done = False
-        state = state_tracker.get_state()
-        while not done:
-            next_state, reward, done, success = one_round_agent_user_action_collect_experience(
-                dqn_agent,state_tracker,state
+    while episode_counter < NUM_EP_TRAIN:
+        episode_counter += 1
+
+        num_turns, dialog_reward, success = run_dialog_episode(dqn_agent, state_tracker)
+        period_reward_total += dialog_reward
+        period_success_total += int(success)
+
+        if episode_counter % TRAIN_INTERVAL == 0:
+            success_rate_best = handle_successfulness(
+                SUCCESS_RATE_THRESHOLD,
+                TRAIN_INTERVAL,
+                episode_counter,
+                period_reward_total,
+                period_success_total,
+                success_rate_best,
             )
-            period_reward_total += reward
-            state = next_state
-
-        period_success_total += success
-
-        # Train
-        if episode % TRAIN_FREQ == 0:
-            # Check success rate
-            success_rate = period_success_total / TRAIN_FREQ
-            avg_reward = period_reward_total / TRAIN_FREQ
-            # Flush
-            if (
-                success_rate >= success_rate_best
-                and success_rate >= SUCCESS_RATE_THRESHOLD
-            ):
-                dqn_agent.empty_memory()
-            # Update current best success rate
-            if success_rate > success_rate_best:
-                print(
-                    "Episode: {} NEW BEST SUCCESS RATE: {} Avg Reward: {}".format(
-                        episode, success_rate, avg_reward
-                    )
-                )
-                success_rate_best = success_rate
-                dqn_agent.save_weights()
             period_success_total = 0
             period_reward_total = 0
-            # Copy
-            dqn_agent.copy()
-            # Train
+            dqn_agent.copy() #TODO(tilo): why?
             dqn_agent.train()
     print("...Training Ended")
+
+
+def handle_successfulness(
+    SUCCESS_RATE_THRESHOLD,
+    TRAIN_INTERVAL,
+    episode_counter,
+    period_reward_total,
+    period_success_total,
+    success_rate_best,
+):
+    success_rate = period_success_total / TRAIN_INTERVAL
+    avg_reward = period_reward_total / TRAIN_INTERVAL
+    if success_rate >= success_rate_best and success_rate >= SUCCESS_RATE_THRESHOLD:
+        dqn_agent.empty_memory()
+
+    # Update current best success rate
+    if success_rate > success_rate_best:
+        print(
+            "Episode: {} NEW BEST SUCCESS RATE: {} Avg Reward: {}".format(
+                episode_counter, success_rate, avg_reward
+            )
+        )
+        success_rate_best = success_rate
+        dqn_agent.save_weights()
+    return success_rate_best
 
 
 def episode_reset(
@@ -156,4 +154,4 @@ if __name__ == "__main__":
     dqn_agent = DQNAgent(state_tracker.get_state_size(), params)
 
     warmup_run(dqn_agent, state_tracker, train_params["warmup_mem"])
-    train_run()
+    run_train(train_params)
