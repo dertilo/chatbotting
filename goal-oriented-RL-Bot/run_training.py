@@ -1,7 +1,7 @@
 from tqdm import tqdm
 
 from Experience import Experience
-from dialog_agent_env import run_dialog_episode, UserSimEnv
+from dialog_agent_env import run_dialog_episode, DialogEnv
 from rulebased_agent import RuleBasedAgent
 from user_simulator import UserSimulator
 from error_model_controller import ErrorModelController
@@ -26,25 +26,19 @@ def get_params(params_json_file="constants.json"):
 
 def warmup_run(
     agent: RuleBasedAgent,
-    user_env:UserSimEnv,
+    dialog_env: DialogEnv,
     experience: Experience,
-    state_tracker: StateTracker,
     num_warmup_steps: int,
 ):
 
-    print("Warmup Started...")
     total_step = 0
     while total_step != num_warmup_steps and not experience.is_memory_full():
         agent.reset_rulebased_vars()
-        num_steps, _, _ = run_dialog_episode(
-            agent, user_env, experience, state_tracker
-        )
+        num_steps, _, _ = run_dialog_episode(agent, dialog_env, experience)
         total_step += num_steps
 
-    print("...Warmup Ended")
 
-
-def run_train(user_env:UserSimEnv, train_params):
+def run_train(user_env: DialogEnv, train_params):
 
     params_to_monitor = {"dialogue": 0, "success-rate": 0.0, "dialog_reward": 0.0}
     running_factor = 0.9
@@ -53,7 +47,7 @@ def run_train(user_env:UserSimEnv, train_params):
         for dialog_counter in range(train_params["num_ep_run"]):
 
             num_turns, dialog_reward, success = run_dialog_episode(
-                dqn_agent, user_env, experience, state_tracker
+                dqn_agent, user_env, experience
             )
 
             if dialog_counter % train_params["train_freq"] == 0:
@@ -68,7 +62,9 @@ def run_train(user_env:UserSimEnv, train_params):
     print("...Training Ended")
 
 
-def update_progess_bar(pbar, dialog_counter, dialog_reward, running_factor, success_rate):
+def update_progess_bar(
+    pbar, dialog_counter, dialog_reward, running_factor, success_rate
+):
     pbar.postfix[0]["dialogue"] = dialog_counter
     pbar.postfix[0]["success-rate"] = round(
         running_factor * pbar.postfix[0]["success-rate"]
@@ -137,8 +133,6 @@ if __name__ == "__main__":
     experience = Experience(params["agent"]["max_mem_size"])
 
     SUCCESS_RATE_THRESHOLD = train_params["success_rate_threshold"]
-    user_env = UserSimEnv(user,emc)
-    warmup_run(
-        rule_agent, user_env, experience, state_tracker, train_params["warmup_mem"]
-    )
-    run_train(user_env, train_params)
+    dialog_env = DialogEnv(user, emc, state_tracker)
+    warmup_run(rule_agent, dialog_env, experience, train_params["warmup_mem"])
+    run_train(dialog_env, train_params)
