@@ -1,7 +1,7 @@
 from tqdm import tqdm
 
 from Experience import Experience
-from dialog_agent_env import run_dialog_episode
+from dialog_agent_env import run_dialog_episode, UserSimEnv
 from rulebased_agent import RuleBasedAgent
 from user_simulator import UserSimulator
 from error_model_controller import ErrorModelController
@@ -26,8 +26,7 @@ def get_params(params_json_file="constants.json"):
 
 def warmup_run(
     agent: RuleBasedAgent,
-    user: UserSimulator,
-    emc: ErrorModelController,
+    user_env:UserSimEnv,
     experience: Experience,
     state_tracker: StateTracker,
     num_warmup_steps: int,
@@ -38,25 +37,23 @@ def warmup_run(
     while total_step != num_warmup_steps and not experience.is_memory_full():
         agent.reset_rulebased_vars()
         num_steps, _, _ = run_dialog_episode(
-            agent, user, emc, experience, state_tracker
+            agent, user_env, experience, state_tracker
         )
         total_step += num_steps
 
     print("...Warmup Ended")
 
 
-def run_train(user: UserSimulator, emc: ErrorModelController, train_params):
-
-    NUM_EP_TRAIN = train_params["num_ep_run"]
+def run_train(user_env:UserSimEnv, train_params):
 
     params_to_monitor = {"dialogue": 0, "success-rate": 0.0, "dialog_reward": 0.0}
     running_factor = 0.9
     with tqdm(postfix=[params_to_monitor]) as pbar:
 
-        for dialog_counter in range(NUM_EP_TRAIN):
+        for dialog_counter in range(train_params["num_ep_run"]):
 
             num_turns, dialog_reward, success = run_dialog_episode(
-                dqn_agent, user, emc, experience, state_tracker
+                dqn_agent, user_env, experience, state_tracker
             )
 
             if dialog_counter % train_params["train_freq"] == 0:
@@ -140,7 +137,8 @@ if __name__ == "__main__":
     experience = Experience(params["agent"]["max_mem_size"])
 
     SUCCESS_RATE_THRESHOLD = train_params["success_rate_threshold"]
+    user_env = UserSimEnv(user,emc)
     warmup_run(
-        rule_agent, user, emc, experience, state_tracker, train_params["warmup_mem"]
+        rule_agent, user_env, experience, state_tracker, train_params["warmup_mem"]
     )
-    run_train(user, emc, train_params)
+    run_train(user_env, train_params)
