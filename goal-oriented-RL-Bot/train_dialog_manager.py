@@ -1,3 +1,4 @@
+import itertools
 import json
 import pickle
 from typing import Dict
@@ -12,12 +13,13 @@ import torch.nn.functional as F
 
 
 from dialog_agent_env import (
-    UserGoal,
     DialogEnv,
     DialogManagerAgent,
     experience_generator,
     gather_experience,
-    load_data)
+    load_data,
+)
+from rulebased_agent import RuleBasedAgent
 
 
 def calc_estimated_return(
@@ -39,23 +41,40 @@ def calc_loss(agent, estimated_return, observation, action):
     return loss_value
 
 
-def train_agent(agent: DialogManagerAgent, dialog_env: DialogEnv, train_steps=3_000, batch_size=32):
+def update_progess_bar(pbar, params: dict, f=0.99):
+    for param_name, value in params.items():
+        if "running" in param_name:
+            value = f * pbar.postfix[0][param_name] + (1 - f) * value
+        pbar.postfix[0][param_name] = round(value, 2)
+    pbar.update()
+
+
+def train_agent(
+    rule_agent: RuleBasedAgent,
+    agent: DialogManagerAgent,
+    dialog_env: DialogEnv,
+    train_steps=3_000,
+    batch_size=32,
+):
     optimizer = RMSprop(agent.parameters())
+    warmup_experience_iterator = iter(experience_generator(rule_agent, dialog_env,max_it=1000))
     experience_iterator = iter(experience_generator(agent, dialog_env))
+    exp_it = itertools.chain(*[warmup_experience_iterator,experience_iterator])
 
-    for it in tqdm(range(train_steps)):
-        with torch.no_grad():
-            agent.eval()
-            exp = gather_experience(experience_iterator, batch_size=batch_size)
-            estimated_return = calc_estimated_return(agent, exp)
+    with tqdm(postfix=[{"reward": 0.0}]) as pbar:
 
-        agent.train()
-        loss_value = calc_loss(agent, estimated_return, exp["obs"], exp["action"])
-        optimizer.zero_grad()
-        loss_value.backward()
-        optimizer.step()
+        for it in range(train_steps):
+            with torch.no_grad():
+                agent.eval()
+                exp = gather_experience(exp_it, batch_size=batch_size)
+                estimated_return = calc_estimated_return(agent, exp)
 
-
+            agent.train()
+            loss_value = calc_loss(agent, estimated_return, exp["obs"], exp["action"])
+            optimizer.zero_grad()
+            loss_value.backward()
+            optimizer.step()
+            update_progess_bar(pbar, {"reward": float(np.mean(exp["next_reward"]))})
 
 
 if __name__ == "__main__":
@@ -82,6 +101,8 @@ if __name__ == "__main__":
     )
 
     agent = DialogManagerAgent(dialog_env.observation_space, dialog_env.action_space)
+    rule_agent = RuleBasedAgent(params["agent"]["epsilon_init"])
+
     # experience_iterator = iter(experience_generator(agent, dialog_env))
     # batch = gather_experience(experience_iterator)
-    train_agent(agent,dialog_env,100)
+    train_agent(rule_agent,agent, dialog_env, 9000)

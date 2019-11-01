@@ -1,5 +1,6 @@
 import json
 import pickle
+import sys
 from collections import Iterator
 from typing import NamedTuple, List, Dict, Any
 
@@ -8,8 +9,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from dialogue_config import map_index_to_action
+from dialogue_config import map_index_to_action, AGENT_ACTIONS
 from error_model_controller import ErrorModelController
+from rulebased_agent import RuleBasedAgent
 from state_tracker import StateTracker
 from user_simulator import UserSimulator
 from utils import remove_empty_slots
@@ -51,13 +53,13 @@ class DialogManagerAgent(nn.Module):
         q_values = self.nn(observation_tensor)
         return q_values
 
-    def step_batch(self, obs_batch, eps=0.001):
+    def step_batch(self, obs_batch, eps=0.01):
         q_values = self.calc_q_values(obs_batch)
         policy_actions = q_values.argmax(dim=1)
         actions = mix_in_some_random_actions(policy_actions, eps, self.num_actions)
         return actions
 
-    def step_single(self, obs, eps=0.001):
+    def step_single(self, obs, eps=0.1):
         obs_batch = np.expand_dims(obs, 0)
         actions = self.step_batch(obs_batch, eps)
         return int(actions.numpy()[0])
@@ -70,14 +72,14 @@ class DialogEnv(gym.Env):
         emc_params: Dict,
         max_round_num: int,
         database: Dict,
-        slot2values:Dict[str,List[Any]]
+        slot2values: Dict[str, List[Any]],
     ) -> None:
 
         self.user = UserSimulator(user_goals, max_round_num, database)
         self.emc = ErrorModelController(slot2values, emc_params)
         self.state_tracker = StateTracker(database, max_round_num)
 
-        self.action_space = gym.spaces.Discrete(2)
+        self.action_space = gym.spaces.Discrete(len(AGENT_ACTIONS))
         self.observation_space = gym.spaces.multi_binary.MultiBinary(
             self.state_tracker.get_state_size()
         )
@@ -100,9 +102,12 @@ class DialogEnv(gym.Env):
 
 
 def experience_generator(
-    agent: DialogManagerAgent, dialog_env: DialogEnv, num_max_steps=30
+    agent: DialogManagerAgent,
+    dialog_env: DialogEnv,
+    num_max_steps=30,
+    max_it=sys.maxsize,
 ):
-    while True:
+    for i in range(max_it):
         state = dialog_env.reset()
         for turn in range(1, num_max_steps + 1):
             agent_action_index = agent.step_single(state)
@@ -165,7 +170,9 @@ if __name__ == "__main__":
         user_goals, params["emc"], params["run"]["max_round_num"], database, slot2values
     )
 
-    agent = DialogManagerAgent(dialog_env.observation_space, dialog_env.action_space)
-    experience_iterator = iter(experience_generator(agent, dialog_env))
+    # agent = DialogManagerAgent(dialog_env.observation_space, dialog_env.action_space)
+    rule_agent = RuleBasedAgent(params["agent"]["epsilon_init"])
+
+    experience_iterator = iter(experience_generator(rule_agent, dialog_env))
     batch = gather_experience(experience_iterator)
     print()

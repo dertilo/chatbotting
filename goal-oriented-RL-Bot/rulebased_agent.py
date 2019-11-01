@@ -1,4 +1,6 @@
 import random
+import torch
+
 from dialogue_config import RULE_REQUESTS, AGENT_ACTIONS, map_action_to_index, \
     map_index_to_action
 
@@ -10,21 +12,19 @@ class RuleBasedAgent:
         self.eps = eps
         self.possible_actions = AGENT_ACTIONS
         self.num_actions = len(self.possible_actions)
-        self.reset_rulebased_vars()
+        self.reset()
 
 
-    def reset_rulebased_vars(self):
+    def reset(self):
         self.rule_current_slot_index = 0
         self.rule_phase = "not done"
 
-    def get_action(self,_):
-
+    def step_single(self, _):
         if self.eps > random.random():
-            index = random.randint(0, self.num_actions - 1)
-            action = map_index_to_action(index)
-            return index, action
+            action =  random.randint(0, self.num_actions - 1)
         else:
-            return self._rule_action()
+            action =  self._rule_action()
+        return torch.tensor(action,dtype=torch.int64)
 
     def _rule_action(self):
 
@@ -49,4 +49,4 @@ class RuleBasedAgent:
             raise Exception("Should not have reached this clause")
 
         index = map_action_to_index(rule_response)
-        return index, rule_response
+        return index
