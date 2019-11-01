@@ -1,10 +1,62 @@
-from Experience import Experience
+import json
+import pickle
+from collections import Iterator
+
+import gym
+import numpy as np
+import torch
+import torch.nn as nn
+
+from dialogue_config import map_index_to_action
 from error_model_controller import ErrorModelController
 from state_tracker import StateTracker
 from user_simulator import UserSimulator
+from utils import remove_empty_slots
 
 
-class DialogEnv(object):
+def mix_in_some_random_actions(policy_actions, eps, num_actions):
+    if eps > 0.0:
+        random_actions = torch.randint_like(policy_actions, num_actions)
+        selector = torch.rand_like(random_actions, dtype=torch.float32)
+        actions = torch.where(selector > eps, policy_actions, random_actions)
+    else:
+        actions = policy_actions
+    return actions
+
+
+class DialogManagerAgent(nn.Module):
+    def __init__(self, obs_space, action_space):
+        super().__init__()
+        self.num_actions = action_space.n
+        n_hid = 32
+        self.nn = nn.Sequential(
+            *[
+                nn.Linear(obs_space.shape[0], n_hid),
+                nn.ReLU(),
+                # nn.Linear(8, 4),
+                # nn.ReLU(),
+                nn.Linear(n_hid, self.num_actions),
+            ]
+        )
+
+    def calc_q_values(self, obs_batch):
+        observation_tensor = torch.tensor(obs_batch, dtype=torch.float)
+        q_values = self.nn(observation_tensor)
+        return q_values
+
+    def step_batch(self, obs_batch, eps=0.001):
+        q_values = self.calc_q_values(obs_batch)
+        policy_actions = q_values.argmax(dim=1)
+        actions = mix_in_some_random_actions(policy_actions, eps, self.num_actions)
+        return actions
+
+    def step_single(self, obs, eps=0.001):
+        obs_batch = np.expand_dims(obs, 0)
+        actions = self.step_batch(obs_batch, eps)
+        return int(actions.numpy()[0])
+
+
+class DialogEnv(gym.Env):
     def __init__(
         self,
         user: UserSimulator,
@@ -14,6 +66,10 @@ class DialogEnv(object):
         self.user = user
         self.emc = emc
         self.state_tracker = state_tracker
+        self.action_space = gym.spaces.Discrete(2)
+        self.observation_space = gym.spaces.multi_binary.MultiBinary(
+            state_tracker.get_state_size()
+        )
 
     def step(self, agent_action):
         self.state_tracker.update_state_agent(agent_action)
@@ -32,20 +88,65 @@ class DialogEnv(object):
         return self.state_tracker.get_state()
 
 
-def run_dialog_episode(
-    agent, dialog_env: DialogEnv, experience: Experience, num_max_steps=30
+def experience_generator(
+    agent: DialogManagerAgent, dialog_env: DialogEnv, num_max_steps=30
 ):
-    state = dialog_env.reset()
-    turn = 0
-    reward_sum = 0
-    for turn in range(1, num_max_steps + 1):
-        agent_action_index, agent_action = agent.get_action(state)
-        next_state, reward, done, success = dialog_env.step(agent_action)
+    while True:
+        state = dialog_env.reset()
+        for turn in range(1, num_max_steps + 1):
+            agent_action_index = agent.step_single(state)
+            agent_action = map_index_to_action(agent_action_index)
+            next_state, reward, done, success = dialog_env.step(agent_action)
 
-        experience.add_experience(state,agent_action_index,next_state,reward,done)
+            yield {
+                "obs": state,
+                "next_obs": next_state,
+                "action": agent_action_index,
+                "next_reward": reward,
+                "next_done": done,
+            }
 
-        state = next_state
-        reward_sum += reward
-        if done:
-            break
-    return turn, reward_sum, success
+            state = next_state
+            if done:
+                break
+
+
+def gather_experience(experience_iter: Iterator, batch_size: int = 32):
+    experience_batch = [next(experience_iter) for _ in range(batch_size)]
+    exp_arrays = {
+        key: np.array([exp[key] for exp in experience_batch])
+        for key in experience_batch[0].keys()
+    }
+    return exp_arrays
+
+
+def get_params(params_json_file="constants.json"):
+    with open(params_json_file) as f:
+        constants = json.load(f)
+    return constants
+
+if __name__ == "__main__":
+    params = get_params()
+    file_path_dict = params["db_file_paths"]
+    DATABASE_FILE_PATH = file_path_dict["database"]
+    DICT_FILE_PATH = file_path_dict["dict"]
+    USER_GOALS_FILE_PATH = file_path_dict["user_goals"]
+
+    train_params = params["run"]
+
+    database = pickle.load(open(DATABASE_FILE_PATH, "rb"), encoding="latin1")
+    remove_empty_slots(database)
+
+    db_dict = pickle.load(open(DICT_FILE_PATH, "rb"), encoding="latin1")
+    user_goals = pickle.load(open(USER_GOALS_FILE_PATH, "rb"), encoding="latin1")
+
+    user = UserSimulator(user_goals, params, database)
+    emc = ErrorModelController(db_dict, params)
+    state_tracker = StateTracker(database, params)
+
+    dialog_env = DialogEnv(user, emc, state_tracker)
+
+    agent = DialogManagerAgent(dialog_env.observation_space,dialog_env.action_space)
+    experience_iterator = iter(experience_generator(agent, dialog_env))
+    batch = gather_experience(experience_iterator)
+    print()
