@@ -1,12 +1,13 @@
 from tqdm import tqdm
 
 from Experience import Experience
+from dialog_agent_env import run_dialog_episode
 from rulebased_agent import RuleBasedAgent
 from user_simulator import UserSimulator
 from error_model_controller import ErrorModelController
 from dqn_agent import DQNAgent
 from state_tracker import StateTracker
-import pickle, argparse, json, math
+import pickle, json
 from utils import remove_empty_slots
 
 
@@ -23,25 +24,10 @@ def get_params(params_json_file="constants.json"):
     return constants
 
 
-def one_round_agent_user_action_collect_experience(
-    agent, experience: Experience, state_tracker: StateTracker, state
-):
-    agent_action_index, agent_action = agent.get_action(state)
-
-    state_tracker.update_state_agent(agent_action)
-    user_action, reward, done, success = user.step(agent_action)
-    if not done:
-        emc.infuse_error(user_action)
-
-    state_tracker.update_state_user(user_action)
-    next_state = state_tracker.get_state(done)
-    experience.add_experience(state, agent_action_index, reward, next_state, done)
-
-    return next_state, reward, done, success
-
-
 def warmup_run(
     agent: RuleBasedAgent,
+    user: UserSimulator,
+    emc: ErrorModelController,
     experience: Experience,
     state_tracker: StateTracker,
     num_warmup_steps: int,
@@ -51,29 +37,15 @@ def warmup_run(
     total_step = 0
     while total_step != num_warmup_steps and not experience.is_memory_full():
         agent.reset_rulebased_vars()
-        num_steps, _, _ = run_dialog_episode(agent, experience, state_tracker)
+        num_steps, _, _ = run_dialog_episode(
+            agent, user, emc, experience, state_tracker
+        )
         total_step += num_steps
 
     print("...Warmup Ended")
 
 
-def run_dialog_episode(agent, experience: Experience, state_tracker, num_max_steps=30):
-    episode_reset(state_tracker, user, emc)
-    state = state_tracker.get_state()
-    turn = 0
-    reward_sum = 0
-    for turn in range(1, num_max_steps + 1):
-        next_state, reward, done, success = one_round_agent_user_action_collect_experience(
-            agent, experience, state_tracker, state
-        )
-        state = next_state
-        reward_sum += reward
-        if done:
-            break
-    return turn, reward_sum, success
-
-
-def run_train(train_params):
+def run_train(user: UserSimulator, emc: ErrorModelController, train_params):
 
     NUM_EP_TRAIN = train_params["num_ep_run"]
     TRAIN_INTERVAL = train_params["train_freq"]
@@ -90,7 +62,7 @@ def run_train(train_params):
         for dialog_counter in range(NUM_EP_TRAIN):
 
             num_turns, dialog_reward, success = run_dialog_episode(
-                dqn_agent, experience, state_tracker
+                dqn_agent, user, emc, experience, state_tracker
             )
             period_reward_total += dialog_reward
             period_success_total += int(success)
@@ -100,9 +72,12 @@ def run_train(train_params):
                 avg_reward = period_reward_total / TRAIN_INTERVAL
 
                 flushed_agent_memory, success_rate_best = handle_successfulness(
-                    success_rate, avg_reward,
-                    dqn_agent,experience,
-                    dialog_counter, success_rate_best
+                    success_rate,
+                    avg_reward,
+                    dqn_agent,
+                    experience,
+                    dialog_counter,
+                    success_rate_best,
                 )
                 period_success_total = 0
                 period_reward_total = 0
@@ -132,10 +107,14 @@ def update_progess_bar(pbar, dialog_counter, avg_reward, running_factor, success
     pbar.update()
 
 
-def handle_successfulness(success_rate, avg_reward,
-                          agent, experience:Experience,
-                          episode_counter,
-                          success_rate_best):
+def handle_successfulness(
+    success_rate,
+    avg_reward,
+    agent,
+    experience: Experience,
+    episode_counter,
+    success_rate_best,
+):
     is_new_highscore = success_rate > success_rate_best
     # flushed_agent_memory = False
     """
@@ -148,9 +127,7 @@ def handle_successfulness(success_rate, avg_reward,
     This then allows newer experiences from the better version of the model to 
     fill the memory. This way the training and performance is stabilized.
     """
-    flushed_agent_memory = (
-            is_new_highscore and success_rate >= SUCCESS_RATE_THRESHOLD
-    )
+    flushed_agent_memory = is_new_highscore and success_rate >= SUCCESS_RATE_THRESHOLD
     if flushed_agent_memory:
         experience.empty_memory()
 
@@ -163,15 +140,6 @@ def handle_successfulness(success_rate, avg_reward,
         success_rate_best = success_rate
         agent.save_weights()
     return flushed_agent_memory, success_rate_best
-
-
-def episode_reset(
-    state_tracker: StateTracker, user: UserSimulator, emc: ErrorModelController
-):
-    state_tracker.reset()
-    init_user_action = user.reset()
-    emc.infuse_error(init_user_action)
-    state_tracker.update_state_user(init_user_action)
 
 
 if __name__ == "__main__":
@@ -193,5 +161,7 @@ if __name__ == "__main__":
     experience = Experience(params["agent"]["max_mem_size"])
 
     SUCCESS_RATE_THRESHOLD = train_params["success_rate_threshold"]
-    warmup_run(rule_agent, experience, state_tracker, train_params["warmup_mem"])
-    run_train(train_params)
+    warmup_run(
+        rule_agent, user, emc, experience, state_tracker, train_params["warmup_mem"]
+    )
+    run_train(user, emc, train_params)

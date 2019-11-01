@@ -19,7 +19,7 @@ class DQNAgent:
 
         self.C = constants["agent"]
         self.eps = self.C["epsilon_init"]
-        self.vanilla = self.C["vanilla"]
+        self.use_ddqn = not self.C["vanilla"]
         self.lr = self.C["learning_rate"]
         self.gamma = self.C["gamma"]
         self.batch_size = self.C["batch_size"]
@@ -111,7 +111,7 @@ class DQNAgent:
             assert next_states.shape == states.shape
 
             beh_state_preds = self._dqn_predict(states)  # For leveling error
-            if not self.vanilla:
+            if self.use_ddqn:
                 beh_next_states_preds = self._dqn_predict(
                     next_states
                 )  # For indexing for DDQN
@@ -124,7 +124,7 @@ class DQNAgent:
 
             for i, (s, a, r, s_, d) in enumerate(batch):
                 t = beh_state_preds[i]
-                if not self.vanilla:
+                if self.use_ddqn:
                     t[a] = r + self.gamma * tar_next_state_preds[i][
                         np.argmax(beh_next_states_preds[i])
                     ] * (not d)
@@ -137,7 +137,6 @@ class DQNAgent:
             self.beh_model.fit(inputs, targets, epochs=1, verbose=0)
 
     def update_target_model_weights(self):
-
         self.tar_model.set_weights(self.beh_model.get_weights())
 
     def save_weights(self):
