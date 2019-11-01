@@ -48,14 +48,8 @@ def warmup_run(
 def run_train(user: UserSimulator, emc: ErrorModelController, train_params):
 
     NUM_EP_TRAIN = train_params["num_ep_run"]
-    TRAIN_INTERVAL = train_params["train_freq"]
 
-    print("Training Started...")
-    period_reward_total = 0
-    period_success_total = 0
-    success_rate_best = 0.0
-
-    params_to_monitor = {"dialogue": 0, "success-rate": 0.0, "avg-reward": 0.0}
+    params_to_monitor = {"dialogue": 0, "success-rate": 0.0, "dialog_reward": 0.0}
     running_factor = 0.9
     with tqdm(postfix=[params_to_monitor]) as pbar:
 
@@ -64,44 +58,29 @@ def run_train(user: UserSimulator, emc: ErrorModelController, train_params):
             num_turns, dialog_reward, success = run_dialog_episode(
                 dqn_agent, user, emc, experience, state_tracker
             )
-            period_reward_total += dialog_reward
-            period_success_total += int(success)
 
-            if dialog_counter % TRAIN_INTERVAL == 0:
-                success_rate = period_success_total / TRAIN_INTERVAL
-                avg_reward = period_reward_total / TRAIN_INTERVAL
+            if dialog_counter % train_params["train_freq"] == 0:
 
-                flushed_agent_memory, success_rate_best = handle_successfulness(
-                    success_rate,
-                    avg_reward,
-                    dqn_agent,
-                    experience,
-                    dialog_counter,
-                    success_rate_best,
-                )
-                period_success_total = 0
-                period_reward_total = 0
                 dqn_agent.update_target_model_weights()
-                if not flushed_agent_memory:
-                    dqn_agent.train(experience)
+                dqn_agent.train(experience)
 
                 update_progess_bar(
-                    pbar, dialog_counter, avg_reward, running_factor, success_rate
+                    pbar, dialog_counter, dialog_reward, running_factor, int(success)
                 )
 
     print("...Training Ended")
 
 
-def update_progess_bar(pbar, dialog_counter, avg_reward, running_factor, success_rate):
+def update_progess_bar(pbar, dialog_counter, dialog_reward, running_factor, success_rate):
     pbar.postfix[0]["dialogue"] = dialog_counter
     pbar.postfix[0]["success-rate"] = round(
         running_factor * pbar.postfix[0]["success-rate"]
         + (1 - running_factor) * success_rate,
         2,
     )
-    pbar.postfix[0]["avg-reward"] = round(
-        running_factor * pbar.postfix[0]["avg-reward"]
-        + (1 - running_factor) * avg_reward,
+    pbar.postfix[0]["dialog_reward"] = round(
+        running_factor * pbar.postfix[0]["dialog_reward"]
+        + (1 - running_factor) * dialog_reward,
         2,
     )
     pbar.update()
