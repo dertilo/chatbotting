@@ -1,6 +1,7 @@
 import json
 import pickle
 from collections import Iterator
+from typing import NamedTuple, List, Dict
 
 import gym
 import numpy as np
@@ -12,6 +13,12 @@ from error_model_controller import ErrorModelController
 from state_tracker import StateTracker
 from user_simulator import UserSimulator
 from utils import remove_empty_slots
+
+
+class UserGoal(NamedTuple):
+    request_slots: dict
+    diaact: str
+    inform_slots: dict
 
 
 def mix_in_some_random_actions(policy_actions, eps, num_actions):
@@ -59,16 +66,19 @@ class DialogManagerAgent(nn.Module):
 class DialogEnv(gym.Env):
     def __init__(
         self,
-        user: UserSimulator,
-        emc: ErrorModelController,
-        state_tracker: StateTracker,
+        user_goals: List[UserGoal],
+        emc_params: Dict,
+        max_round_num: int,
+        database: Dict,
     ) -> None:
-        self.user = user
-        self.emc = emc
-        self.state_tracker = state_tracker
+
+        self.user = UserSimulator(user_goals, max_round_num, database)
+        self.emc = ErrorModelController(db_dict, emc_params)
+        self.state_tracker = StateTracker(database, max_round_num)
+
         self.action_space = gym.spaces.Discrete(2)
         self.observation_space = gym.spaces.multi_binary.MultiBinary(
-            state_tracker.get_state_size()
+            self.state_tracker.get_state_size()
         )
 
     def step(self, agent_action):
@@ -125,6 +135,7 @@ def get_params(params_json_file="constants.json"):
         constants = json.load(f)
     return constants
 
+
 if __name__ == "__main__":
     params = get_params()
     file_path_dict = params["db_file_paths"]
@@ -138,15 +149,16 @@ if __name__ == "__main__":
     remove_empty_slots(database)
 
     db_dict = pickle.load(open(DICT_FILE_PATH, "rb"), encoding="latin1")
-    user_goals = pickle.load(open(USER_GOALS_FILE_PATH, "rb"), encoding="latin1")
+    user_goals = [
+        UserGoal(**d)
+        for d in pickle.load(open(USER_GOALS_FILE_PATH, "rb"), encoding="latin1")
+    ]
 
-    user = UserSimulator(user_goals, params, database)
-    emc = ErrorModelController(db_dict, params)
-    state_tracker = StateTracker(database, params)
+    dialog_env = DialogEnv(
+        user_goals, params["emc"], params["run"]["max_round_num"], database
+    )
 
-    dialog_env = DialogEnv(user, emc, state_tracker)
-
-    agent = DialogManagerAgent(dialog_env.observation_space,dialog_env.action_space)
+    agent = DialogManagerAgent(dialog_env.observation_space, dialog_env.action_space)
     experience_iterator = iter(experience_generator(agent, dialog_env))
     batch = gather_experience(experience_iterator)
     print()

@@ -1,26 +1,18 @@
 import random
+from typing import Dict, List
+
 from dialogue_config import usersim_intents
 
 
 class ErrorModelController:
     """Adds error to the user action."""
 
-    def __init__(self, db_dict, constants):
-        """
-        The constructor for ErrorModelController.
+    def __init__(self, slot2values:Dict[str,List[str]], emc_params):
 
-        Saves items in constants, etc.
-
-        Parameters:
-            db_dict (dict): The database dict with format dict(string: list) where each key is the slot name and
-                            the list is of possible values
-            constants (dict): Loaded constants in dict
-        """
-
-        self.movie_dict = db_dict
-        self.slot_error_prob = constants["emc"]["slot_error_prob"]
-        self.slot_error_mode = constants["emc"]["slot_error_mode"]  # [0, 3]
-        self.intent_error_prob = constants["emc"]["intent_error_prob"]
+        self.slot2values = slot2values
+        self.slot_error_prob = emc_params["slot_error_prob"]
+        self.slot_error_mode = emc_params["slot_error_mode"]  # [0, 3]
+        self.intent_error_prob = emc_params["intent_error_prob"]
         self.intents = usersim_intents
 
     def infuse_error(self, frame):
@@ -37,7 +29,7 @@ class ErrorModelController:
 
         informs_dict = frame["inform_slots"]
         for key in list(frame["inform_slots"].keys()):
-            assert key in self.movie_dict
+            assert key in self.slot2values
             if random.random() < self.slot_error_prob:
                 if self.slot_error_mode == 0:  # replace the slot_value only
                     self._slot_value_noise(key, informs_dict)
@@ -65,7 +57,7 @@ class ErrorModelController:
             informs_dict (dict)
         """
 
-        informs_dict[key] = random.choice(self.movie_dict[key])
+        informs_dict[key] = random.choice(self.slot2values[key])
 
     def _slot_noise(self, key, informs_dict):
         """
@@ -77,8 +69,8 @@ class ErrorModelController:
         """
 
         informs_dict.pop(key)
-        random_slot = random.choice(list(self.movie_dict.keys()))
-        informs_dict[random_slot] = random.choice(self.movie_dict[random_slot])
+        random_slot = random.choice(list(self.slot2values.keys()))
+        informs_dict[random_slot] = random.choice(self.slot2values[random_slot])
 
     def _slot_remove(self, key, informs_dict):
         """

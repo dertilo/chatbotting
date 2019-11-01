@@ -6,20 +6,8 @@ import copy
 
 
 class StateTracker:
-    """Tracks the state of the episode/conversation and prepares the state representation for the agent."""
 
-    def __init__(self, database, constants):
-        """
-        The constructor of StateTracker.
-
-        The constructor of StateTracker which creates a DB query object, creates necessary state rep. dicts, etc. and
-        calls reset.
-
-        Parameters:
-            database (dict): The database with format dict(long: dict)
-            constants (dict): Loaded constants in dict
-
-        """
+    def __init__(self, database, max_round_num):
 
         self.db_helper = DBQuery(database)
         self.match_key = usersim_default_key
@@ -27,7 +15,7 @@ class StateTracker:
         self.num_intents = len(all_intents)
         self.slots_dict = convert_list_to_dict(all_slots)
         self.num_slots = len(all_slots)
-        self.max_round_num = constants["run"]["max_round_num"]
+        self.max_round_num = max_round_num
         self.none_state = np.zeros(self.get_state_size())
         self.reset()
 

@@ -1,3 +1,5 @@
+from typing import Dict, List
+
 from dialogue_config import (
     usersim_default_key,
     FAIL,
@@ -11,20 +13,11 @@ import random, copy
 
 
 class UserSimulator:
-    """Simulates a real user, to train the agent with reinforcement learning."""
 
-    def __init__(self, goal_list, constants, database):
-        """
-        The constructor for UserSimulator. Sets dialogue config variables.
-
-        Parameters:
-            goal_list (list): User goals loaded from file
-            constants (dict): Dict of constants loaded from file
-            database (dict): The database in the format dict(long: dict)
-        """
+    def __init__(self, goal_list, max_round, database:List[Dict]):
 
         self.goal_list = goal_list
-        self.max_round = constants["run"]["max_round_num"]
+        self.max_round = max_round
         self.default_key = usersim_default_key
         # A list of REQUIRED to be in the first action inform keys
         self.init_informs = usersim_required_init_inform_keys
