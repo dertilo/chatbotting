@@ -1,7 +1,7 @@
 import json
 import pickle
 from collections import Iterator
-from typing import NamedTuple, List, Dict
+from typing import NamedTuple, List, Dict, Any
 
 import gym
 import numpy as np
@@ -70,10 +70,11 @@ class DialogEnv(gym.Env):
         emc_params: Dict,
         max_round_num: int,
         database: Dict,
+        slot2values:Dict[str,List[Any]]
     ) -> None:
 
         self.user = UserSimulator(user_goals, max_round_num, database)
-        self.emc = ErrorModelController(db_dict, emc_params)
+        self.emc = ErrorModelController(slot2values, emc_params)
         self.state_tracker = StateTracker(database, max_round_num)
 
         self.action_space = gym.spaces.Discrete(2)
@@ -136,6 +137,17 @@ def get_params(params_json_file="constants.json"):
     return constants
 
 
+def load_data(DATABASE_FILE_PATH, DICT_FILE_PATH, USER_GOALS_FILE_PATH):
+    database = pickle.load(open(DATABASE_FILE_PATH, "rb"), encoding="latin1")
+    remove_empty_slots(database)
+    slot2values = pickle.load(open(DICT_FILE_PATH, "rb"), encoding="latin1")
+    user_goals = [
+        UserGoal(**d)
+        for d in pickle.load(open(USER_GOALS_FILE_PATH, "rb"), encoding="latin1")
+    ]
+    return slot2values, database, user_goals
+
+
 if __name__ == "__main__":
     params = get_params()
     file_path_dict = params["db_file_paths"]
@@ -145,17 +157,12 @@ if __name__ == "__main__":
 
     train_params = params["run"]
 
-    database = pickle.load(open(DATABASE_FILE_PATH, "rb"), encoding="latin1")
-    remove_empty_slots(database)
-
-    db_dict = pickle.load(open(DICT_FILE_PATH, "rb"), encoding="latin1")
-    user_goals = [
-        UserGoal(**d)
-        for d in pickle.load(open(USER_GOALS_FILE_PATH, "rb"), encoding="latin1")
-    ]
+    slot2values, database, user_goals = load_data(
+        DATABASE_FILE_PATH, DICT_FILE_PATH, USER_GOALS_FILE_PATH
+    )
 
     dialog_env = DialogEnv(
-        user_goals, params["emc"], params["run"]["max_round_num"], database
+        user_goals, params["emc"], params["run"]["max_round_num"], database, slot2values
     )
 
     agent = DialogManagerAgent(dialog_env.observation_space, dialog_env.action_space)

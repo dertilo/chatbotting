@@ -13,8 +13,7 @@ import random, copy
 
 
 class UserSimulator:
-
-    def __init__(self, goal_list, max_round, database:List[Dict]):
+    def __init__(self, goal_list, max_round, database: Dict):
 
         self.goal_list = goal_list
         self.max_round = max_round
@@ -37,7 +36,7 @@ class UserSimulator:
 
         self.goal = random.choice(self.goal_list)
         # Add default slot to requests of goal
-        self.goal["request_slots"][self.default_key] = "UNK"
+        self.goal.request_slots[self.default_key] = "UNK"
         self.state = {}
         # Add all inform slots informed by agent or user sim to this dict
         self.state["history_slots"] = {}
@@ -47,8 +46,8 @@ class UserSimulator:
         self.state["request_slots"] = {}
         # Init. all informs and requests in user goal, remove slots as informs made by user or agent
         self.state["rest_slots"] = {}
-        self.state["rest_slots"].update(self.goal["inform_slots"])
-        self.state["rest_slots"].update(self.goal["request_slots"])
+        self.state["rest_slots"].update(self.goal.inform_slots)
+        self.state["rest_slots"].update(self.goal.request_slots)
         self.state["intent"] = ""
         # False for failure, true for success, init. to failure
         self.constraint_check = FAIL
@@ -68,31 +67,31 @@ class UserSimulator:
         # Always request
         self.state["intent"] = "request"
 
-        if self.goal["inform_slots"]:
+        if self.goal.inform_slots:
             # Pick all the required init. informs, and add if they exist in goal inform slots
             for inform_key in self.init_informs:
-                if inform_key in self.goal["inform_slots"]:
-                    self.state["inform_slots"][inform_key] = self.goal["inform_slots"][
+                if inform_key in self.goal.inform_slots:
+                    self.state["inform_slots"][inform_key] = self.goal.inform_slots[
                         inform_key
                     ]
                     self.state["rest_slots"].pop(inform_key)
-                    self.state["history_slots"][inform_key] = self.goal["inform_slots"][
+                    self.state["history_slots"][inform_key] = self.goal.inform_slots[
                         inform_key
                     ]
             # If nothing was added then pick a random one to add
             if not self.state["inform_slots"]:
-                key, value = random.choice(list(self.goal["inform_slots"].items()))
+                key, value = random.choice(list(self.goal.inform_slots.items()))
                 self.state["inform_slots"][key] = value
                 self.state["rest_slots"].pop(key)
                 self.state["history_slots"][key] = value
 
         # Now add a request, do a random one if something other than def. available
-        self.goal["request_slots"].pop(self.default_key)
-        if self.goal["request_slots"]:
-            req_key = random.choice(list(self.goal["request_slots"].keys()))
+        self.goal.request_slots.pop(self.default_key)
+        if self.goal.request_slots:
+            req_key = random.choice(list(self.goal.request_slots.keys()))
         else:
             req_key = self.default_key
-        self.goal["request_slots"][self.default_key] = "UNK"
+        self.goal.request_slots[self.default_key] = "UNK"
         self.state["request_slots"][req_key] = "UNK"
 
         user_response = {}
@@ -170,19 +169,19 @@ class UserSimulator:
         for key in self.state["history_slots"]:
             assert key not in self.state["rest_slots"]
         # All slots in both rest and hist should contain the slots for goal
-        for inf_key in self.goal["inform_slots"]:
+        for inf_key in self.goal.inform_slots:
             assert self.state["history_slots"].get(inf_key, False) or self.state[
                 "rest_slots"
             ].get(inf_key, False)
-        for req_key in self.goal["request_slots"]:
+        for req_key in self.goal.request_slots:
             assert self.state["history_slots"].get(req_key, False) or self.state[
                 "rest_slots"
             ].get(req_key, False), req_key
         # Anything in the rest should be in the goal
         for key in self.state["rest_slots"]:
-            assert self.goal["inform_slots"].get(key, False) or self.goal[
-                "request_slots"
-            ].get(key, False)
+            assert self.goal.inform_slots.get(
+                key, False
+            ) or self.goal.request_slots.get(key, False)
         assert self.state["intent"] != ""
         # -----------------------
 
@@ -208,20 +207,20 @@ class UserSimulator:
 
         agent_request_key = list(agent_action["request_slots"].keys())[0]
         # First Case: if agent requests for something that is in the user sims goal inform slots, then inform it
-        if agent_request_key in self.goal["inform_slots"]:
+        if agent_request_key in self.goal.inform_slots:
             self.state["intent"] = "inform"
-            self.state["inform_slots"][agent_request_key] = self.goal["inform_slots"][
+            self.state["inform_slots"][agent_request_key] = self.goal.inform_slots[
                 agent_request_key
             ]
             self.state["request_slots"].clear()
             self.state["rest_slots"].pop(agent_request_key, None)
-            self.state["history_slots"][agent_request_key] = self.goal["inform_slots"][
+            self.state["history_slots"][agent_request_key] = self.goal.inform_slots[
                 agent_request_key
             ]
         # Second Case: if the agent requests for something in user sims goal request slots and it has already been
         # informed, then inform it
         elif (
-            agent_request_key in self.goal["request_slots"]
+            agent_request_key in self.goal.request_slots
             and agent_request_key in self.state["history_slots"]
         ):
             self.state["intent"] = "inform"
@@ -233,7 +232,7 @@ class UserSimulator:
         # Third Case: if the agent requests for something in the user sims goal request slots and it HASN'T been
         # informed, then request it with a random inform
         elif (
-            agent_request_key in self.goal["request_slots"]
+            agent_request_key in self.goal.request_slots
             and agent_request_key in self.state["rest_slots"]
         ):
             self.state["request_slots"].clear()
@@ -283,15 +282,15 @@ class UserSimulator:
 
         # First Case: If agent informs something that is in goal informs and the value it informed doesnt match,
         # then inform the correct value
-        if agent_inform_value != self.goal["inform_slots"].get(
+        if agent_inform_value != self.goal.inform_slots.get(
             agent_inform_key, agent_inform_value
         ):
             self.state["intent"] = "inform"
-            self.state["inform_slots"][agent_inform_key] = self.goal["inform_slots"][
+            self.state["inform_slots"][agent_inform_key] = self.goal.inform_slots[
                 agent_inform_key
             ]
             self.state["request_slots"].clear()
-            self.state["history_slots"][agent_inform_key] = self.goal["inform_slots"][
+            self.state["history_slots"][agent_inform_key] = self.goal.inform_slots[
                 agent_inform_key
             ]
         # Second Case: Otherwise pick a random action to take
@@ -348,7 +347,7 @@ class UserSimulator:
             self.constraint_check = FAIL
 
         # Check to see if all goal informs are in the agent informs, and that the values match
-        for key, value in self.goal["inform_slots"].items():
+        for key, value in self.goal.inform_slots.items():
             assert value != None
             # For items that cannot be in the queries don't check to see if they are in the agent informs here
             if key in self.no_query:
@@ -388,7 +387,7 @@ class UserSimulator:
             self.database[int(self.state["history_slots"][self.default_key])]
         )
 
-        for key, value in self.goal["inform_slots"].items():
+        for key, value in self.goal.inform_slots.items():
             assert value != None
             if key in self.no_query:
                 continue
