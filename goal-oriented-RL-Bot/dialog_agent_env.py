@@ -59,7 +59,7 @@ class DialogManagerAgent(nn.Module):
         actions = mix_in_some_random_actions(policy_actions, eps, self.num_actions)
         return actions
 
-    def step_single(self, obs, eps=0.1):
+    def step(self, obs, eps=0.1):
         obs_batch = np.expand_dims(obs, 0)
         actions = self.step_batch(obs_batch, eps)
         return int(actions.numpy()[0])
@@ -110,7 +110,7 @@ def experience_generator(
     for i in range(max_it):
         state = dialog_env.reset()
         for turn in range(1, num_max_steps + 1):
-            agent_action_index = agent.step_single(state)
+            agent_action_index = agent.step(state)
             agent_action = map_index_to_action(agent_action_index)
             next_state, reward, done, success = dialog_env.step(agent_action)
 

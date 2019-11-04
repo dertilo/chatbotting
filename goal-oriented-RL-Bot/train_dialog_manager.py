@@ -56,7 +56,7 @@ def train_agent(
     train_steps=3_000,
     batch_size=32,
 ):
-    optimizer = RMSprop(agent.parameters())
+    optimizer = RMSprop(agent.parameters(),lr=1e-3)
     warmup_experience_iterator = iter(experience_generator(rule_agent, dialog_env,max_it=1000))
     experience_iterator = iter(experience_generator(agent, dialog_env))
     exp_it = itertools.chain(*[warmup_experience_iterator,experience_iterator])
@@ -105,4 +105,4 @@ if __name__ == "__main__":
 
     # experience_iterator = iter(experience_generator(agent, dialog_env))
     # batch = gather_experience(experience_iterator)
-    train_agent(rule_agent,agent, dialog_env, 9000)
+    train_agent(rule_agent,agent, dialog_env, 10_000)
