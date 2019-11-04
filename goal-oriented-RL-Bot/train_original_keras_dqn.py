@@ -1,27 +1,35 @@
+import json
+from time import time
+
 from tqdm import tqdm
 
 from Experience import Experience
-from dialog_agent_env import run_dialog_episode, DialogEnv
+from dialog_agent_env import DialogEnv, load_data
+from dialogue_config import map_index_to_action
+from original_keras_dqn_agent import DQNAgent
 from rulebased_agent import RuleBasedAgent
-from user_simulator import UserSimulator
-from error_model_controller import ErrorModelController
-from dqn_agent import DQNAgent
-from state_tracker import StateTracker
-import pickle, json
-from utils import remove_empty_slots
+
+exp_iter = None
 
 
-def get_params(params_json_file="constants.json"):
-    global DATABASE_FILE_PATH, DICT_FILE_PATH, USER_GOALS_FILE_PATH, USE_USERSIM, NUM_EP_TRAIN, TRAIN_INTERVAL
+def run_dialog_episode(
+    agent: DQNAgent, dialog_env: DialogEnv, experience: Experience, num_max_steps=30
+):
+    state = dialog_env.reset()
+    turn = 0
+    reward_sum = 0
+    for turn in range(1, num_max_steps + 1):
+        agent_action_index = agent.step(state)
+        agent_action = map_index_to_action(agent_action_index)
+        next_state, reward, done, success = dialog_env.step(agent_action)
 
-    with open(params_json_file) as f:
-        constants = json.load(f)
+        experience.add_experience(state, agent_action_index, next_state, reward, done)
 
-    file_path_dict = constants["db_file_paths"]
-    DATABASE_FILE_PATH = file_path_dict["database"]
-    DICT_FILE_PATH = file_path_dict["dict"]
-    USER_GOALS_FILE_PATH = file_path_dict["user_goals"]
-    return constants
+        state = next_state
+        reward_sum += reward
+        if done:
+            break
+    return turn, reward_sum, success
 
 
 def warmup_run(
@@ -33,44 +41,42 @@ def warmup_run(
 
     total_step = 0
     while total_step != num_warmup_steps and not experience.is_memory_full():
-        agent.reset_rulebased_vars()
+        agent.reset()
         num_steps, _, _ = run_dialog_episode(agent, dialog_env, experience)
         total_step += num_steps
 
 
-def run_train(user_env: DialogEnv, train_params):
+def run_train(
+    dqn_agent: DQNAgent,
+    dialog_env: DialogEnv,
+    experience: Experience,
+    num_episodes,
+    train_freq,
+):
 
-    params_to_monitor = {"dialogue": 0, "success-rate": 0.0, "dialog_reward": 0.0}
+    params_to_monitor = {"dialogue": 0, "dialog_reward": 0.0}
     running_factor = 0.9
+    reward_sum = 0
     with tqdm(postfix=[params_to_monitor]) as pbar:
 
-        for dialog_counter in range(train_params["num_ep_run"]):
+        for dialog_counter in range(1, num_episodes + 1):
 
             num_turns, dialog_reward, success = run_dialog_episode(
-                dqn_agent, user_env, experience
+                dqn_agent, dialog_env, experience
             )
-
-            if dialog_counter % train_params["train_freq"] == 0:
+            reward_sum += dialog_reward
+            if dialog_counter % train_freq == 0:
 
                 dqn_agent.update_target_model_weights()
                 dqn_agent.train(experience)
 
                 update_progess_bar(
-                    pbar, dialog_counter, dialog_reward, running_factor, int(success)
+                    pbar, dialog_counter, reward_sum / dialog_counter, running_factor
                 )
 
-    print("...Training Ended")
 
-
-def update_progess_bar(
-    pbar, dialog_counter, dialog_reward, running_factor, success_rate
-):
+def update_progess_bar(pbar, dialog_counter, dialog_reward, running_factor):
     pbar.postfix[0]["dialogue"] = dialog_counter
-    pbar.postfix[0]["success-rate"] = round(
-        running_factor * pbar.postfix[0]["success-rate"]
-        + (1 - running_factor) * success_rate,
-        2,
-    )
     pbar.postfix[0]["dialog_reward"] = round(
         running_factor * pbar.postfix[0]["dialog_reward"]
         + (1 - running_factor) * dialog_reward,
@@ -115,24 +121,32 @@ def handle_successfulness(
 
 
 if __name__ == "__main__":
-    params = get_params()
+    with open("constants.json") as f:
+        params = json.load(f)
+
+    file_path_dict = params["db_file_paths"]
+    DATABASE_FILE_PATH = file_path_dict["database"]
+    DICT_FILE_PATH = file_path_dict["dict"]
+    USER_GOALS_FILE_PATH = file_path_dict["user_goals"]
     train_params = params["run"]
 
-    # Note: If you get an unpickling error here then run 'pickle_converter.py' and it should fix it
-    database = pickle.load(open(DATABASE_FILE_PATH, "rb"), encoding="latin1")
-    remove_empty_slots(database)
+    slot2values, database, user_goals = load_data(
+        DATABASE_FILE_PATH, DICT_FILE_PATH, USER_GOALS_FILE_PATH
+    )
 
-    db_dict = pickle.load(open(DICT_FILE_PATH, "rb"), encoding="latin1")
-    user_goals = pickle.load(open(USER_GOALS_FILE_PATH, "rb"), encoding="latin1")
-    user = UserSimulator(user_goals, params, database)
-
-    emc = ErrorModelController(db_dict, params)
-    state_tracker = StateTracker(database, params)
-    dqn_agent = DQNAgent(state_tracker.get_state_size(), params)
+    dialog_env = DialogEnv(
+        user_goals, params["emc"], params["run"]["max_round_num"], database, slot2values
+    )
+    dqn_agent = DQNAgent(dialog_env.state_tracker.get_state_size(), params)
     rule_agent = RuleBasedAgent(params["agent"]["epsilon_init"])
-    experience = Experience(params["agent"]["max_mem_size"])
+    experience = Experience(100_000)
 
     SUCCESS_RATE_THRESHOLD = train_params["success_rate_threshold"]
-    dialog_env = DialogEnv(user, emc, state_tracker)
-    warmup_run(rule_agent, dialog_env, experience, train_params["warmup_mem"])
-    run_train(dialog_env, train_params)
+    start = time()
+    warmup_run(rule_agent, dialog_env, experience, 10_000)
+    # num_episodes = train_params["num_ep_run"]
+    num_episodes = 4000
+    run_train(
+        dqn_agent, dialog_env, experience, num_episodes, train_params["train_freq"]
+    )
+    print(time() - start)

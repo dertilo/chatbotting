@@ -44,15 +44,14 @@ class DQNAgent:
         model.compile(loss="mse", optimizer=Adam(lr=self.lr))
         return model
 
-    def get_action(self, state):
+    def step(self, state):
 
         if self.eps > random.random():
             index = random.randint(0, self.num_actions - 1)
         else:
             index = np.argmax(self._dqn_predict_one(state))
 
-        action = map_index_to_action(index)
-        return index,action
+        return index
 
     def _dqn_predict_one(self, state, target=False):
         """
