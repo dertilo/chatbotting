@@ -69,7 +69,7 @@ class DialogEnv(gym.Env):
         slot2values: Dict[str, List[Any]],
     ) -> None:
 
-        self.user = UserSimulator(user_goals, max_round_num, database)
+        self.user = UserSimulator(user_goals, max_round_num)
         self.emc = ErrorModelController(slot2values, emc_params)
         self.state_tracker = StateTracker(database, max_round_num)
 

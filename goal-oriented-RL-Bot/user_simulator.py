@@ -21,7 +21,7 @@ class UserGoal(NamedTuple):
 
 
 class UserSimulator:
-    def __init__(self, goal_list: List[UserGoal], max_round: int, database: Dict):
+    def __init__(self, goal_list: List[UserGoal], max_round: int):
 
         self.goal_list = goal_list
         self.max_round = max_round
@@ -29,10 +29,6 @@ class UserSimulator:
         # A list of REQUIRED to be in the first action inform keys
         self.init_informs = usersim_required_init_inform_keys
         self.no_query = no_query_keys
-
-        # TEMP ----
-        self.database = database
-        # ---------
 
     def reset(self):
         self.goal = random.choice(self.goal_list)
@@ -333,15 +329,6 @@ class UserSimulator:
             self.state["request_slots"].clear()
 
     def _response_to_done(self):
-        """
-        Augments the state in response to the agent action having an intent of done.
-
-        If the constraint_check is SUCCESS and both the rest and request slots of the state are empty for the agent
-        to succeed in this episode/conversation.
-
-        Returns:
-            int: Success: -1, 0 or 1 for loss, neither win nor loss, win
-        """
 
         if self.constraint_check == FAIL:
             return FAIL
@@ -350,21 +337,5 @@ class UserSimulator:
             assert not self.state["request_slots"]
         if self.state["rest_slots"]:
             return FAIL
-
-        # TEMP: ----
-        assert self.state["history_slots"][self.default_key] != "no match available"
-
-        match = copy.deepcopy(
-            self.database[int(self.state["history_slots"][self.default_key])]
-        )
-
-        for key, value in self.goal.inform_slots.items():
-            assert value != None
-            if key in self.no_query:
-                continue
-            if value != match.get(key, None):
-                assert True is False, "match: {}\ngoal: {}".format(match, self.goal)
-                break
-        # ----------
 
         return SUCCESS
