@@ -8,7 +8,6 @@ import copy
 
 
 class StateTracker:
-
     def __init__(self, database, max_round_num):
 
         self.db_helper = DBQuery(database)
@@ -36,14 +35,16 @@ class StateTracker:
         for action in self.history:
             print(action)
 
-    def get_state(self, done=False)->np.ndarray:
+    def get_state(self, done=False) -> np.ndarray:
 
         if done:
             return self.none_state
 
-        user_action:DialogAction = self.history[-1]
+        user_action: DialogAction = self.history[-1]
         db_results_dict = self.db_helper.get_db_results_for_slots(self.current_informs)
-        last_agent_action:Union[DialogAction,None] = self.history[-2] if len(self.history) > 1 else None
+        last_agent_action: Union[DialogAction, None] = self.history[-2] if len(
+            self.history
+        ) > 1 else None
 
         # Create one-hot of intents to represent the current user action
         user_act_rep = np.zeros((self.num_intents,))
@@ -123,38 +124,43 @@ class StateTracker:
 
         return state_representation
 
-    def update_state_agent(self, agent_action:DialogAction):
+    def update_state_agent(self, agent_action: DialogAction):
 
         if agent_action.intent == "inform":
-            assert agent_action.inform_slots
-            slot_name= list(agent_action.inform_slots.keys())[0]
-            value = self.db_helper.get_inform_value(
-                slot_name, self.current_informs
-            )
-            agent_action.inform_slots = {slot_name:value}
-            assert agent_action.inform_slots
-            key, value = list(agent_action.inform_slots.items())[0]  # Only one
-            assert key != "match_found"
-            assert value != "PLACEHOLDER", "KEY: {}".format(key)
-            self.current_informs[key] = value
-        # If intent is match_found then fill the action informs with the matches informs (if there is a match)
+            self.handle_inform_with_db_query(agent_action)
         elif agent_action.intent == "match_found":
-            assert agent_action.inform_slots is None #"Cannot inform and have intent of match found!"
-            db_results = self.db_helper.get_db_results(self.current_informs)
-            if db_results:
-                # Arbitrarily pick the first value of the dict
-                key, value = list(db_results.items())[0]
-                agent_action.inform_slots = copy.deepcopy(value)
-                agent_action.inform_slots[self.match_key] = str(key)
-            else:
-                agent_action.inform_slots = {self.match_key:"no match available"}
-            self.current_informs[self.match_key] = agent_action.inform_slots[
-                self.match_key
-            ]
+            self.handle_match_found(agent_action)
+
         agent_action.turn = self.round_num
         self.history.append(agent_action)
 
-    def update_state_user(self, user_action:DialogAction):
+    def handle_match_found(self, agent_action:DialogAction):
+        # If intent is match_found then fill the action informs with the matches informs (if there is a match)
+        assert agent_action.inform_slots is None
+        # "Cannot inform and have intent of match found!"
+        db_results = self.db_helper.get_db_results(self.current_informs)
+        if db_results:
+            # Arbitrarily pick the first value of the dict
+            key, value = list(db_results.items())[0]
+            agent_action.inform_slots = copy.deepcopy(value)
+            agent_action.inform_slots[self.match_key] = str(key)
+        else:
+            agent_action.inform_slots = {self.match_key: "no match available"}
+
+        value = agent_action.inform_slots[self.match_key]
+        self.current_informs[self.match_key] = value
+
+    def handle_inform_with_db_query(self, agent_action: DialogAction):
+        assert agent_action.inform_slots
+        slot_name = list(agent_action.inform_slots.keys())[0]
+        value = self.db_helper.get_inform_value(slot_name, self.current_informs)
+        agent_action.inform_slots = {slot_name: value}
+        key, value = list(agent_action.inform_slots.items())[0]  # Only one
+        assert key != "match_found"
+        assert value != "PLACEHOLDER", "KEY: {}".format(key)
+        self.current_informs[key] = value
+
+    def update_state_user(self, user_action: DialogAction):
 
         for key, value in user_action.inform_slots.items():
             self.current_informs[key] = value
