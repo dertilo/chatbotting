@@ -1,11 +1,10 @@
 import random
 from typing import Dict, List
 
-from dialogue_config import usersim_intents
+from dialogue_config import usersim_intents, DialogAction
 
 
 class ErrorModelController:
-    """Adds error to the user action."""
 
     def __init__(self, slot2values:Dict[str,List[str]], emc_params):
 
@@ -15,7 +14,7 @@ class ErrorModelController:
         self.intent_error_prob = emc_params["intent_error_prob"]
         self.intents = usersim_intents
 
-    def infuse_error(self, frame):
+    def infuse_error(self, action:DialogAction):
         """
         Takes a semantic frame/action as a dict and adds 'error'.
 
@@ -27,8 +26,8 @@ class ErrorModelController:
                           'speaker': 'User')
         """
 
-        informs_dict = frame["inform_slots"]
-        for key in list(frame["inform_slots"].keys()):
+        informs_dict = action.inform_slots
+        for key in list(action.inform_slots.keys()):
             assert key in self.slot2values
             if random.random() < self.slot_error_prob:
                 if self.slot_error_mode == 0:  # replace the slot_value only
@@ -46,7 +45,7 @@ class ErrorModelController:
                     else:
                         self._slot_remove(key, informs_dict)
         if random.random() < self.intent_error_prob:  # add noise for intent level
-            frame["intent"] = random.choice(self.intents)
+            action.intent = random.choice(self.intents)
 
     def _slot_value_noise(self, key, informs_dict):
         """

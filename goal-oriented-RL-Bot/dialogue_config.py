@@ -1,8 +1,11 @@
 # Special slot values (for reference)
-"PLACEHOLDER"  # For informs
+PLACEHOLDER = "PLACEHOLDER"  # For informs
 import copy
+import json
+from dataclasses import dataclass
+from typing import Dict
 
-"UNK"  # For requests
+UNK = "UNK"  # For requests
 "anything"  # means any value works for the slot with this value
 "no match available"  # When the intent of the agent is match_found yet no db match fits current constraints
 
@@ -21,6 +24,8 @@ usersim_required_init_inform_keys = ["moviename"]
 #######################################
 # Agent Config
 #######################################
+USER = "USER"
+AGENT = 'AGENT'
 
 # Possible inform and request slots for the agent
 agent_inform_slots = [
@@ -66,26 +71,29 @@ agent_request_slots = [
     "numberofkids",
 ]
 
-# Possible actions for agent
-AGENT_ACTIONS = [
-    {
-        "intent": "done",
-        "inform_slots": {},
-        "request_slots": {},
-    },  # Triggers closing of conversation
-    {"intent": "match_found", "inform_slots": {}, "request_slots": {}},
+@dataclass
+class DialogAction: # should be (NamedTuple)
+    intent: str
+    inform_slots: Dict[str, str] = None
+    request_slots: Dict[str, str] = None
+    round:int = 0
+    speaker:str= AGENT
+
+
+inform_actions = [
+    DialogAction("inform", {slot: "PLACEHOLDER"})
+    for slot in agent_inform_slots
+    if slot != usersim_default_key
 ]
-for slot in agent_inform_slots:
-    # Must use intent match found to inform this, but still have to keep in agent inform slots
-    if slot == usersim_default_key:
-        continue
-    AGENT_ACTIONS.append(
-        {"intent": "inform", "inform_slots": {slot: "PLACEHOLDER"}, "request_slots": {}}
-    )
-for slot in agent_request_slots:
-    AGENT_ACTIONS.append(
-        {"intent": "request", "inform_slots": {}, "request_slots": {slot: "UNK"}}
-    )
+request_actions = [
+    DialogAction("request", request_slots={slot: "UNK"})
+    for slot in agent_request_slots
+]
+
+AGENT_ACTIONS = (
+        [DialogAction("done"), DialogAction("match_found")] + inform_actions + request_actions
+)
+
 
 # Rule-based policy request list
 RULE_REQUESTS = ["moviename", "starttime", "city", "date", "theater", "numberofpeople"]
@@ -136,6 +144,11 @@ all_slots = [
     "mc_list",
 ]
 
+idx2action={i:a for i,a in enumerate(AGENT_ACTIONS)}
+action2idx = {json.dumps(v.__dict__):k for k,v in idx2action.items()}
+
+def map_index_to_action(index):
+    return copy.deepcopy(idx2action[index])
 
 def map_action_to_index(response):
     for (i, action) in enumerate(AGENT_ACTIONS):
@@ -144,8 +157,5 @@ def map_action_to_index(response):
     raise ValueError("Response: {} not found in possible actions".format(response))
 
 
-def map_index_to_action(index):
-    for (i, action) in enumerate(AGENT_ACTIONS):
-        if index == i:
-            return copy.deepcopy(action)
-    raise ValueError("Index: {} not in range of possible actions".format(index))
+# def map_action_to_index(response):
+#     return action2idx[json.dumps(response)]

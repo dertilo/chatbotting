@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, NamedTuple
 
 from dialogue_config import (
     usersim_default_key,
@@ -7,13 +7,21 @@ from dialogue_config import (
     SUCCESS,
     usersim_required_init_inform_keys,
     no_query_keys,
-)
+    DialogAction,
+    USER,
+    PLACEHOLDER, UNK)
 from utils import reward_function
 import random, copy
 
 
+class UserGoal(NamedTuple):
+    request_slots: dict
+    diaact: str
+    inform_slots: dict
+
+
 class UserSimulator:
-    def __init__(self, goal_list, max_round, database: Dict):
+    def __init__(self, goal_list: List[UserGoal], max_round: int, database: Dict):
 
         self.goal_list = goal_list
         self.max_round = max_round
@@ -27,44 +35,15 @@ class UserSimulator:
         # ---------
 
     def reset(self):
-        """
-        Resets the user sim. by emptying the state and returning the initial action.
-
-        Returns:
-            dict: The initial action of an episode
-        """
-
         self.goal = random.choice(self.goal_list)
-        # Add default slot to requests of goal
         self.goal.request_slots[self.default_key] = "UNK"
-        self.state = {}
-        # Add all inform slots informed by agent or user sim to this dict
-        self.state["history_slots"] = {}
-        # Any inform slots for the current user sim action, empty at start of turn
-        self.state["inform_slots"] = {}
-        # Current request slots the user sim wants to request
-        self.state["request_slots"] = {}
-        # Init. all informs and requests in user goal, remove slots as informs made by user or agent
-        self.state["rest_slots"] = {}
-        self.state["rest_slots"].update(self.goal.inform_slots)
-        self.state["rest_slots"].update(self.goal.request_slots)
+        self.state = {k: {} for k in ["history_slots", "inform_slots", "request_slots"]}
+        self.state["rest_slots"] = {**self.goal.inform_slots, **self.goal.request_slots}
         self.state["intent"] = ""
-        # False for failure, true for success, init. to failure
         self.constraint_check = FAIL
-
         return self._return_init_action()
 
     def _return_init_action(self):
-        """
-        Returns the initial action of the episode.
-
-        The initial action has an intent of request, required init. inform slots and a single request slot.
-
-        Returns:
-            dict: Initial user response
-        """
-
-        # Always request
         self.state["intent"] = "request"
 
         if self.goal.inform_slots:
@@ -94,14 +73,16 @@ class UserSimulator:
         self.goal.request_slots[self.default_key] = "UNK"
         self.state["request_slots"][req_key] = "UNK"
 
-        user_response = {}
-        user_response["intent"] = self.state["intent"]
-        user_response["request_slots"] = copy.deepcopy(self.state["request_slots"])
-        user_response["inform_slots"] = copy.deepcopy(self.state["inform_slots"])
+        user_response = DialogAction(
+            self.state["intent"],
+            self.state["inform_slots"],
+            self.state["request_slots"],
+            speaker=USER,
+        )
 
         return user_response
 
-    def step(self, agent_action):
+    def step(self, agent_action: DialogAction):
         """
         Return the response of the user sim. to the agent by using rules that simulate a user.
 
@@ -119,14 +100,15 @@ class UserSimulator:
         """
 
         # Assertions -----
-        # No UNK in agent action informs
-        for value in agent_action["inform_slots"].values():
-            assert value != "UNK"
-            assert value != "PLACEHOLDER"
-        # No PLACEHOLDER in agent at all
-        for value in agent_action["request_slots"].values():
-            assert value != "PLACEHOLDER"
-        # ----------------
+        if agent_action.inform_slots is not None:
+            assert all(
+                value != UNK and value != PLACEHOLDER
+                for value in agent_action.inform_slots.values()
+            )
+        if agent_action.request_slots is not None:
+            assert all(
+                value != PLACEHOLDER for value in agent_action.request_slots.values()
+            )
 
         self.state["inform_slots"].clear()
         self.state["intent"] = ""
@@ -134,13 +116,13 @@ class UserSimulator:
         done = False
         success = NO_OUTCOME
         # First check round num, if equal to max then fail
-        if agent_action["round"] == self.max_round:
+        if agent_action.round == self.max_round:
             done = True
             success = FAIL
             self.state["intent"] = "done"
             self.state["request_slots"].clear()
         else:
-            agent_intent = agent_action["intent"]
+            agent_intent = agent_action.intent
             if agent_intent == "request":
                 self._response_to_request(agent_action)
             elif agent_intent == "inform":
@@ -185,16 +167,18 @@ class UserSimulator:
         assert self.state["intent"] != ""
         # -----------------------
 
-        user_response = {}
-        user_response["intent"] = self.state["intent"]
-        user_response["request_slots"] = copy.deepcopy(self.state["request_slots"])
-        user_response["inform_slots"] = copy.deepcopy(self.state["inform_slots"])
+        user_response = DialogAction(
+            self.state["intent"],
+            self.state["inform_slots"],
+            self.state["request_slots"],
+            speaker=USER,
+        )
 
         reward = reward_function(success, self.max_round)
 
         return user_response, reward, done, True if success is 1 else False
 
-    def _response_to_request(self, agent_action):
+    def _response_to_request(self, agent_action: DialogAction):
         """
         Augments the state in response to the agent action having an intent of request.
 
@@ -205,7 +189,7 @@ class UserSimulator:
                                  'round_num': int)
         """
 
-        agent_request_key = list(agent_action["request_slots"].keys())[0]
+        agent_request_key = list(agent_action.request_slots.keys())[0]
         # First Case: if agent requests for something that is in the user sims goal inform slots, then inform it
         if agent_request_key in self.goal.inform_slots:
             self.state["intent"] = "inform"
@@ -256,7 +240,7 @@ class UserSimulator:
             self.state["request_slots"].clear()
             self.state["history_slots"][agent_request_key] = "anything"
 
-    def _response_to_inform(self, agent_action):
+    def _response_to_inform(self, agent_action: DialogAction):
         """
         Augments the state in response to the agent action having an intent of inform.
 
@@ -268,8 +252,8 @@ class UserSimulator:
                                  'round_num': int)
         """
 
-        agent_inform_key = list(agent_action["inform_slots"].keys())[0]
-        agent_inform_value = agent_action["inform_slots"][agent_inform_key]
+        agent_inform_key = list(agent_action.inform_slots.keys())[0]
+        agent_inform_value = agent_action.inform_slots[agent_inform_key]
 
         assert agent_inform_key != self.default_key
 
@@ -320,7 +304,7 @@ class UserSimulator:
             else:
                 self.state["intent"] = "thanks"
 
-    def _response_to_match_found(self, agent_action):
+    def _response_to_match_found(self, agent_action: DialogAction):
         """
         Augments the state in response to the agent action having an intent of match_found.
 
@@ -331,7 +315,7 @@ class UserSimulator:
                                  'round_num': int)
         """
 
-        agent_informs = agent_action["inform_slots"]
+        agent_informs = agent_action.inform_slots
 
         self.state["intent"] = "thanks"
         self.constraint_check = SUCCESS

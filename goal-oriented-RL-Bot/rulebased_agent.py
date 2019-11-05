@@ -1,8 +1,6 @@
 import random
-import torch
-
 from dialogue_config import RULE_REQUESTS, AGENT_ACTIONS, map_action_to_index, \
-    map_index_to_action
+    DialogAction
 
 
 class RuleBasedAgent:
@@ -26,25 +24,17 @@ class RuleBasedAgent:
             action =  self._rule_action()
         return action
 
-    def _rule_action(self):
+    def _rule_action(self)->int:
 
         if self.rule_current_slot_index < len(RULE_REQUESTS):
             slot = RULE_REQUESTS[self.rule_current_slot_index]
             self.rule_current_slot_index += 1
-            rule_response = {
-                "intent": "request",
-                "inform_slots": {},
-                "request_slots": {slot: "UNK"},
-            }
+            rule_response = DialogAction("request", request_slots={slot: "UNK"})
         elif self.rule_phase == "not done":
-            rule_response = {
-                "intent": "match_found",
-                "inform_slots": {},
-                "request_slots": {},
-            }
+            rule_response = DialogAction("match_found")
             self.rule_phase = "done"
         elif self.rule_phase == "done":
-            rule_response = {"intent": "done", "inform_slots": {}, "request_slots": {}}
+            rule_response = DialogAction('done')
         else:
             raise Exception("Should not have reached this clause")
 

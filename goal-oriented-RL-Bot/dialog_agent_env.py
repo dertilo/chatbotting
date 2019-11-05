@@ -2,7 +2,7 @@ import json
 import pickle
 import sys
 from collections import Iterator
-from typing import NamedTuple, List, Dict, Any
+from typing import List, Dict, Any
 
 import gym
 import numpy as np
@@ -13,14 +13,8 @@ from dialogue_config import map_index_to_action, AGENT_ACTIONS
 from error_model_controller import ErrorModelController
 from rulebased_agent import RuleBasedAgent
 from state_tracker import StateTracker
-from user_simulator import UserSimulator
+from user_simulator import UserSimulator, UserGoal
 from utils import remove_empty_slots
-
-
-class UserGoal(NamedTuple):
-    request_slots: dict
-    diaact: str
-    inform_slots: dict
 
 
 def mix_in_some_random_actions(policy_actions, eps, num_actions):
@@ -84,7 +78,8 @@ class DialogEnv(gym.Env):
             self.state_tracker.get_state_size()
         )
 
-    def step(self, agent_action):
+    def step(self, agent_action_index:int):
+        agent_action = map_index_to_action(agent_action_index)
         self.state_tracker.update_state_agent(agent_action)
         user_action, reward, done, success = self.user.step(agent_action)
         if not done:
@@ -110,14 +105,13 @@ def experience_generator(
     for i in range(max_it):
         state = dialog_env.reset()
         for turn in range(1, num_max_steps + 1):
-            agent_action_index = agent.step(state)
-            agent_action = map_index_to_action(agent_action_index)
-            next_state, reward, done, success = dialog_env.step(agent_action)
+            action = agent.step(state)
+            next_state, reward, done, success = dialog_env.step(action)
 
             yield {
                 "obs": state,
                 "next_obs": next_state,
-                "action": agent_action_index,
+                "action": action,
                 "next_reward": reward,
                 "next_done": done,
             }
