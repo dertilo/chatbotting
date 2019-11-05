@@ -76,7 +76,7 @@ class DialogAction: # should be (NamedTuple)
     intent: str
     inform_slots: Dict[str, str] = None
     request_slots: Dict[str, str] = None
-    round:int = 0
+    turn:int = 0
     speaker:str= AGENT
 
 

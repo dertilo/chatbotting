@@ -83,32 +83,8 @@ class UserSimulator:
         return user_response
 
     def step(self, agent_action: DialogAction):
-        """
-        Return the response of the user sim. to the agent by using rules that simulate a user.
 
-        Given the agent action craft a response by using deterministic rules that simulate (to some extent) a user.
-        Some parts of the rules are stochastic. Check if the agent has succeeded or lost or still going.
-
-        Parameters:
-            agent_action (dict): The agent action that the user sim. responds to
-
-        Returns:
-            dict: User sim. response
-            int: Reward
-            bool: Done flag
-            int: Success: -1, 0 or 1 for loss, neither win nor loss, win
-        """
-
-        # Assertions -----
-        if agent_action.inform_slots is not None:
-            assert all(
-                value != UNK and value != PLACEHOLDER
-                for value in agent_action.inform_slots.values()
-            )
-        if agent_action.request_slots is not None:
-            assert all(
-                value != PLACEHOLDER for value in agent_action.request_slots.values()
-            )
+        self.validate_action(agent_action)
 
         self.state["inform_slots"].clear()
         self.state["intent"] = ""
@@ -116,7 +92,7 @@ class UserSimulator:
         done = False
         success = NO_OUTCOME
         # First check round num, if equal to max then fail
-        if agent_action.round == self.max_round:
+        if agent_action.turn == self.max_round:
             done = True
             success = FAIL
             self.state["intent"] = "done"
@@ -177,6 +153,17 @@ class UserSimulator:
         reward = reward_function(success, self.max_round)
 
         return user_response, reward, done, True if success is 1 else False
+
+    def validate_action(self, agent_action):
+        if agent_action.inform_slots is not None:
+            assert all(
+                value != UNK and value != PLACEHOLDER
+                for value in agent_action.inform_slots.values()
+            )
+        if agent_action.request_slots is not None:
+            assert all(
+                value != PLACEHOLDER for value in agent_action.request_slots.values()
+            )
 
     def _response_to_request(self, agent_action: DialogAction):
         """

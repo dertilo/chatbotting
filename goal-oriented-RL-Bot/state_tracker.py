@@ -36,22 +36,8 @@ class StateTracker:
         for action in self.history:
             print(action)
 
-    def get_state(self, done=False):
-        """
-        Returns the state representation as a numpy array which is fed into the agent's neural network.
+    def get_state(self, done=False)->np.ndarray:
 
-        The state representation contains useful information for the agent about the current state of the conversation.
-        Processes by the agent to be fed into the neural network. Ripe for experimentation and optimization.
-
-        Parameters:
-            done (bool): Indicates whether this is the last dialogue in the episode/conversation. Default: False
-
-        Returns:
-            numpy.array: A numpy array of shape (state size,)
-
-        """
-
-        # If done then fill state with zeros
         if done:
             return self.none_state
 
@@ -138,25 +124,14 @@ class StateTracker:
         return state_representation
 
     def update_state_agent(self, agent_action:DialogAction):
-        """
-        Updates the dialogue history with the agent's action and augments the agent's action.
-
-        Takes an agent action and updates the history. Also augments the agent_action param with query information and
-        any other necessary information.
-
-        Parameters:
-            agent_action (dict): The agent action of format dict('intent': string, 'inform_slots': dict,
-                                 'request_slots': dict) and changed to dict('intent': '', 'inform_slots': {},
-                                 'request_slots': {}, 'round': int, 'speaker': 'Agent')
-
-        """
 
         if agent_action.intent == "inform":
             assert agent_action.inform_slots
-            inform_slots = self.db_helper.fill_inform_slot(
-                agent_action.inform_slots, self.current_informs
+            slot_name= list(agent_action.inform_slots.keys())[0]
+            value = self.db_helper.get_inform_value(
+                slot_name, self.current_informs
             )
-            agent_action.inform_slots = inform_slots
+            agent_action.inform_slots = {slot_name:value}
             assert agent_action.inform_slots
             key, value = list(agent_action.inform_slots.items())[0]  # Only one
             assert key != "match_found"
@@ -176,7 +151,7 @@ class StateTracker:
             self.current_informs[self.match_key] = agent_action.inform_slots[
                 self.match_key
             ]
-        agent_action.round = self.round_num
+        agent_action.turn = self.round_num
         self.history.append(agent_action)
 
     def update_state_user(self, user_action:DialogAction):
@@ -184,6 +159,6 @@ class StateTracker:
         for key, value in user_action.inform_slots.items():
             self.current_informs[key] = value
 
-        user_action.round = self.round_num
+        user_action.turn = self.round_num
         self.history.append(user_action)
         self.round_num += 1

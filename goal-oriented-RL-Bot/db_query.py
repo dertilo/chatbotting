@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Dict, Any
 from dialogue_config import no_query_keys, usersim_default_key
 import copy
 
@@ -22,43 +23,25 @@ class DBQuery:
         self.no_query = no_query_keys
         self.match_key = usersim_default_key
 
-    def fill_inform_slot(self, inform_slot_to_fill, current_inform_slots):
-        """
-        Given the current informs/constraints fill the informs that need to be filled with values from the database.
+    def get_inform_value(self, slot_name, current_inform_slots)->str:
 
-        Searches through the database to fill the inform slots with PLACEHOLDER with values that work given the current
-        constraints of the current episode.
-
-        Parameters:
-            inform_slot_to_fill (dict): Inform slots to fill with values
-            current_inform_slots (dict): Current inform slots with values from the StateTracker
-
-        Returns:
-            dict: inform_slot_to_fill filled with values
-        """
-
-        # For this simple system only one inform slot should ever passed in
-        assert len(inform_slot_to_fill) == 1
-
-        key = list(inform_slot_to_fill.keys())[0]
+        key = slot_name
 
         # This removes the inform we want to fill from the current informs if it is present in the current informs
         # so it can be re-queried
         current_informs = copy.deepcopy(current_inform_slots)
         current_informs.pop(key, None)
 
-        # db_results is a dict of dict in the same exact format as the db, it is just a subset of the db
         db_results = self.get_db_results(current_informs)
 
-        filled_inform = {}
         values_dict = self._count_slot_values(key, db_results)
         if values_dict:
             # Get key with max value (ie slot value with highest count of available results)
-            filled_inform[key] = max(values_dict, key=values_dict.get)
+            value = max(values_dict, key=values_dict.get)
         else:
-            filled_inform[key] = "no match available"
+            value = "no match available"
 
-        return filled_inform
+        return value
 
     def _count_slot_values(self, key, db_subdict):
         """
@@ -83,58 +66,46 @@ class DBQuery:
                 slot_values[slot_value] += 1
         return slot_values
 
-    def get_db_results(self, constraints):
-        """
-        Get all items in the database that fit the current constraints.
+    def get_db_results(self, constraints:Dict[str,Any]):
 
-        Looks at each item in the database and if its slots contain all constraints and their values match then the item
-        is added to the return dict.
-
-        Parameters:
-            constraints (dict): The current informs
-
-        Returns:
-            dict: The available items in the database
-        """
-
-        # Filter non-queryable items and keys with the value 'anything' since those are inconsequential to the constraints
-        new_constraints = {
+        constraints = {
             k: v
             for k, v in constraints.items()
             if k not in self.no_query and v is not "anything"
         }
 
-        inform_items = frozenset(new_constraints.items())
+        inform_items = frozenset(constraints.items())
         cache_return = self.cached_db[inform_items]
 
-        if cache_return == None:
-            # If it is none then no matches fit with the constraints so return an empty dict
-            return {}
-        # if it isnt empty then return what it is
-        if cache_return:
-            return cache_return
-        # else continue on
+        if cache_return is None:
+            available_options = {}
+        elif cache_return:
+            available_options = cache_return
+        else:
+            available_options = self.get_availbale_options(constraints, inform_items)
 
+            # if nothing available then set the set of constraint items to none in cache
+            if not available_options:
+                self.cached_db[inform_items] = None
+
+        return available_options
+
+    def get_availbale_options(self, constraints, inform_items):
         available_options = {}
         for id in self.database.keys():
             current_option_dict = self.database[id]
             # First check if that database item actually contains the inform keys
             # Note: this assumes that if a constraint is not found in the db item then that item is not a match
-            if len(set(new_constraints.keys()) - set(self.database[id].keys())) == 0:
+            if len(set(constraints.keys()) - set(self.database[id].keys())) == 0:
                 match = True
                 # Now check all the constraint values against the db values and if there is a mismatch don't store
-                for k, v in new_constraints.items():
+                for k, v in constraints.items():
                     if str(v).lower() != str(current_option_dict[k]).lower():
                         match = False
                 if match:
                     # Update cache
                     self.cached_db[inform_items].update({id: current_option_dict})
                     available_options.update({id: current_option_dict})
-
-        # if nothing available then set the set of constraint items to none in cache
-        if not available_options:
-            self.cached_db[inform_items] = None
-
         return available_options
 
     def get_db_results_for_slots(self, current_informs):
