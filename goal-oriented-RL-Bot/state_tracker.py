@@ -137,13 +137,11 @@ class StateTracker:
     def handle_match_found(self, agent_action:DialogAction):
         # If intent is match_found then fill the action informs with the matches informs (if there is a match)
         assert agent_action.inform_slots is None
-        # "Cannot inform and have intent of match found!"
         db_results = self.db_helper.get_db_results(self.current_informs)
         if db_results:
-            # Arbitrarily pick the first value of the dict
-            key, value = list(db_results.items())[0]
-            agent_action.inform_slots = copy.deepcopy(value)
-            agent_action.inform_slots[self.match_key] = str(key)
+            item_idx, item = list(db_results.items())[0]
+            agent_action.inform_slots = copy.deepcopy(item)
+            agent_action.inform_slots[self.match_key] = str(item_idx)
         else:
             agent_action.inform_slots = {self.match_key: "no match available"}
 
