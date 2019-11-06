@@ -24,7 +24,7 @@ class UserGoal(NamedTuple):
 
 
 @dataclass
-class DialogState:
+class DialogState: # TODO(tilo): is this really needed?
     intent: str
     history_slots: Dict[str, str]
     inform_slots: Dict[str, str]
@@ -179,33 +179,34 @@ class UserSimulator:
             )
 
     def _response_to_request(self, agent_action: DialogAction):
-        """
-        Augments the state in response to the agent action having an intent of request.
-
-        There are 4 main cases for responding.
-
-        Parameters:
-            agent_action (dict): Intent of request with standard action format (including 'speaker': 'Agent' and
-                                 'round_num': int)
-        """
 
         agent_request_key = list(agent_action.request_slots.keys())[0]
-        if agent_request_key in self.goal.inform_slots:
+
+        if self.agent_requests_slot_that_user_wants_to_inform_about(agent_request_key):
             self.handle_agent_request(agent_request_key)
-        elif (
+        elif self.agent_requests_what_he_already_informed_about(agent_request_key):
+            self.inform_agent_about_what_he_should_know(agent_request_key)
+        elif self.agent_asks_for_what_user_wants_to_ask(agent_request_key):
+            self.handle_third_case(agent_request_key)
+        else:  # agent ask for slot that user does not care about
+            self.prepare_dontcare(agent_request_key)
+
+    def agent_requests_slot_that_user_wants_to_inform_about(self, agent_request_key):
+        return agent_request_key in self.goal.inform_slots
+
+    def agent_requests_what_he_already_informed_about(self, agent_request_key):
+        return (
             agent_request_key in self.goal.request_slots
             and agent_request_key in self.state.history_slots
-        ):
-            self.handle_request_for_already_requested(agent_request_key)
-        elif (
+        )
+
+    def agent_asks_for_what_user_wants_to_ask(self, agent_request_key):
+        return (
             agent_request_key in self.goal.request_slots
             and agent_request_key in self.state.rest_slots
-        ):
-            self.handle_third_case(agent_request_key)
-        else:
-            self.handle_fourth_case(agent_request_key)
+        )
 
-    def handle_fourth_case(self, agent_request_key):
+    def prepare_dontcare(self, agent_request_key):
         # Fourth and Final Case: otherwise the user sim does not care about the slot being requested, then inform
         # 'anything' as the value of the requested slot
         assert agent_request_key not in self.state.rest_slots
@@ -221,7 +222,7 @@ class UserSimulator:
         self.state.intent = "request"
         self.state.request_slots[agent_request_key] = "UNK"
         rest_informs = {}
-        for key, value in list(self.state.rest_slots.items()):
+        for key, value in self.state.rest_slots.items():
             if value != "UNK":
                 rest_informs[key] = value
         if rest_informs:
@@ -230,7 +231,7 @@ class UserSimulator:
             self.state.rest_slots.pop(key_choice)
             self.state.history_slots[key_choice] = value_choice
 
-    def handle_request_for_already_requested(self, agent_request_key):
+    def inform_agent_about_what_he_should_know(self, agent_request_key):
         # Second Case: if the agent requests for something in user sims goal request slots and it has already been
         # informed, then inform it
         self.state.intent = "inform"
