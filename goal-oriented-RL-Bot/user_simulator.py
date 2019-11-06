@@ -115,7 +115,7 @@ class UserSimulator:
             elif agent_intent == "inform":
                 self._response_to_inform(agent_action)
             elif agent_intent == "match_found":
-                self._response_to_match_found(agent_action)
+                self._response_to_match_found(agent_action.inform_slots)
             elif agent_intent == "done":
                 success = self._response_to_done()
                 self.state.intent = "done"
@@ -272,12 +272,12 @@ class UserSimulator:
 
         if self.agent_offers_new_information(agent_inform_key, agent_inform_value):
             self.handle_the_meaningful_inform(agent_inform_key)
-        else: # Second Case: Otherwise pick a random action to take
+        else:  # Second Case: Otherwise pick a random action to take
             self.handle_meaningless_inform()
 
     def handle_meaningless_inform(self):
         # - If anything in state requests then request it
-        if len(self.state.request_slots)>0:
+        if len(self.state.request_slots) > 0:
             self.state.intent = "request"
         # - Else if something to say in rest slots, pick something
         elif self.state.rest_slots:
@@ -311,19 +311,7 @@ class UserSimulator:
             agent_inform_key
         ]
 
-    def _response_to_match_found(self, agent_action: DialogAction):
-        """
-        Augments the state in response to the agent action having an intent of match_found.
-
-        Check if there is a match in the agent action that works with the current goal.
-
-        Parameters:
-            agent_action (dict): Intent of match_found with standard action format (including 'speaker': 'Agent' and
-                                 'round_num': int)
-        """
-
-        agent_informs = agent_action.inform_slots
-
+    def _response_to_match_found(self, agent_informs: dict):
         self.state.intent = "thanks"
         self.constraint_check = SUCCESS
 
@@ -337,20 +325,19 @@ class UserSimulator:
         if agent_informs[self.default_key] == "no match available":
             self.constraint_check = FAIL
 
-        # Check to see if all goal informs are in the agent informs, and that the values match
-        for key, value in self.goal.inform_slots.items():
-            assert value != None
-            # For items that cannot be in the queries don't check to see if they are in the agent informs here
-            if key in self.no_query:
-                continue
-            # Will return true if key not in agent informs OR if value does not match value of agent informs[key]
-            if value != agent_informs.get(key, None):
-                self.constraint_check = FAIL
-                break
+        self.check_if_matches_goal(agent_informs)
 
         if self.constraint_check == FAIL:
             self.state.intent = "reject"
             self.state.request_slots.clear()
+
+    def check_if_matches_goal(self, datum: dict):
+        slots_that_must_match = list(
+            filter(lambda kv: kv[0] not in self.no_query, self.goal.inform_slots.items())
+        )
+
+        if any([value != datum.get(key, None) for key, value in slots_that_must_match]):
+            self.constraint_check = FAIL
 
     def _response_to_done(self):
 
