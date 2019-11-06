@@ -71,13 +71,7 @@ class UserSimulator:
                 self.state.rest_slots.pop(key)
                 self.state.history_slots[key] = value
 
-        # Now add a request, do a random one if something other than def. available
-        self.goal.request_slots.pop(self.default_key)
-        if self.goal.request_slots:
-            req_key = random.choice(list(self.goal.request_slots.keys()))
-        else:
-            req_key = self.default_key
-        self.goal.request_slots[self.default_key] = "UNK"
+        req_key = self.get_request_key()
         self.state.request_slots[req_key] = "UNK"
 
         user_response = DialogAction(
@@ -88,6 +82,16 @@ class UserSimulator:
         )
 
         return user_response
+
+    def get_request_key(self):
+        non_default_slots = [
+            k for k in self.goal.request_slots.keys() if k != self.default_key
+        ]
+        if len(non_default_slots) > 0:
+            req_key = random.choice(non_default_slots)
+        else:
+            req_key = self.default_key
+        return req_key
 
     def step(self, agent_action: DialogAction):
 
@@ -131,36 +135,36 @@ class UserSimulator:
 
         return user_response, reward, done, True if success is 1 else False
 
-    def validate_state(self, state: DialogState):
+    def validate_state(self, s: DialogState):
         # If request intent, then make sure request slots
-        if state.intent == "request":
-            assert state.request_slots
+        if s.intent == "request":
+            assert s.request_slots
         # If inform intent, then make sure inform slots and NO request slots
-        if state.intent == "inform":
-            assert state.inform_slots
-            assert not state.request_slots
-        assert "UNK" not in state.inform_slots.values()
-        assert "PLACEHOLDER" not in state.request_slots.values()
+        if s.intent == "inform":
+            assert s.inform_slots
+            assert not s.request_slots
+        assert "UNK" not in s.inform_slots.values()
+        assert "PLACEHOLDER" not in s.request_slots.values()
         # No overlap between rest and hist
-        for key in state.rest_slots:
-            assert key not in state.history_slots
-        for key in state.history_slots:
-            assert key not in state.rest_slots
+        for key in s.rest_slots:
+            assert key not in s.history_slots
+        for key in s.history_slots:
+            assert key not in s.rest_slots
         # All slots in both rest and hist should contain the slots for goal
         for inf_key in self.goal.inform_slots:
-            assert state.history_slots.get(inf_key, False) or state.rest_slots.get(
+            assert s.history_slots.get(inf_key, False) or s.rest_slots.get(
                 inf_key, False
             )
         for req_key in self.goal.request_slots:
-            assert state.history_slots.get(req_key, False) or state.rest_slots.get(
+            assert s.history_slots.get(req_key, False) or s.rest_slots.get(
                 req_key, False
             ), req_key
         # Anything in the rest should be in the goal
-        for key in state.rest_slots:
+        for key in s.rest_slots:
             assert self.goal.inform_slots.get(
                 key, False
             ) or self.goal.request_slots.get(key, False)
-        assert state.intent != ""
+        assert s.intent != ""
         # -----------------------
 
     def validate_action(self, agent_action):
@@ -186,55 +190,67 @@ class UserSimulator:
         """
 
         agent_request_key = list(agent_action.request_slots.keys())[0]
-        # First Case: if agent requests for something that is in the user sims goal inform slots, then inform it
         if agent_request_key in self.goal.inform_slots:
-            self.state.intent = "inform"
-            self.state.inform_slots[agent_request_key] = self.goal.inform_slots[
-                agent_request_key
-            ]
-            self.state.request_slots.clear()
-            self.state.rest_slots.pop(agent_request_key, None)
-            self.state.history_slots[agent_request_key] = self.goal.inform_slots[
-                agent_request_key
-            ]
-        # Second Case: if the agent requests for something in user sims goal request slots and it has already been
-        # informed, then inform it
+            self.handle_agent_request(agent_request_key)
         elif (
             agent_request_key in self.goal.request_slots
             and agent_request_key in self.state.history_slots
         ):
-            self.state.intent = "inform"
-            self.state.inform_slots[agent_request_key] = self.state.history_slots[
-                agent_request_key
-            ]
-            self.state.request_slots.clear()
-            assert agent_request_key not in self.state.rest_slots
-        # Third Case: if the agent requests for something in the user sims goal request slots and it HASN'T been
-        # informed, then request it with a random inform
+            self.handle_request_for_already_requested(agent_request_key)
         elif (
             agent_request_key in self.goal.request_slots
             and agent_request_key in self.state.rest_slots
         ):
-            self.state.request_slots.clear()
-            self.state.intent = "request"
-            self.state.request_slots[agent_request_key] = "UNK"
-            rest_informs = {}
-            for key, value in list(self.state.rest_slots.items()):
-                if value != "UNK":
-                    rest_informs[key] = value
-            if rest_informs:
-                key_choice, value_choice = random.choice(list(rest_informs.items()))
-                self.state.inform_slots[key_choice] = value_choice
-                self.state.rest_slots.pop(key_choice)
-                self.state.history_slots[key_choice] = value_choice
+            self.handle_third_case(agent_request_key)
+        else:
+            self.handle_fourth_case(agent_request_key)
+
+    def handle_fourth_case(self, agent_request_key):
         # Fourth and Final Case: otherwise the user sim does not care about the slot being requested, then inform
         # 'anything' as the value of the requested slot
-        else:
-            assert agent_request_key not in self.state.rest_slots
-            self.state.intent = "inform"
-            self.state.inform_slots[agent_request_key] = "anything"
-            self.state.request_slots.clear()
-            self.state.history_slots[agent_request_key] = "anything"
+        assert agent_request_key not in self.state.rest_slots
+        self.state.intent = "inform"
+        self.state.inform_slots[agent_request_key] = "anything"
+        self.state.request_slots.clear()
+        self.state.history_slots[agent_request_key] = "anything"
+
+    def handle_third_case(self, agent_request_key):
+        # Third Case: if the agent requests for something in the user sims goal request slots and it HASN'T been
+        # informed, then request it with a random inform
+        self.state.request_slots.clear()
+        self.state.intent = "request"
+        self.state.request_slots[agent_request_key] = "UNK"
+        rest_informs = {}
+        for key, value in list(self.state.rest_slots.items()):
+            if value != "UNK":
+                rest_informs[key] = value
+        if rest_informs:
+            key_choice, value_choice = random.choice(list(rest_informs.items()))
+            self.state.inform_slots[key_choice] = value_choice
+            self.state.rest_slots.pop(key_choice)
+            self.state.history_slots[key_choice] = value_choice
+
+    def handle_request_for_already_requested(self, agent_request_key):
+        # Second Case: if the agent requests for something in user sims goal request slots and it has already been
+        # informed, then inform it
+        self.state.intent = "inform"
+        self.state.inform_slots[agent_request_key] = self.state.history_slots[
+            agent_request_key
+        ]
+        self.state.request_slots.clear()
+        assert agent_request_key not in self.state.rest_slots
+
+    def handle_agent_request(self, agent_request_key):
+        # First Case: if agent requests for something that is in the user sims goal inform slots, then inform it
+        self.state.intent = "inform"
+        self.state.inform_slots[agent_request_key] = self.goal.inform_slots[
+            agent_request_key
+        ]
+        self.state.request_slots.clear()
+        self.state.rest_slots.pop(agent_request_key, None)
+        self.state.history_slots[agent_request_key] = self.goal.inform_slots[
+            agent_request_key
+        ]
 
     def _response_to_inform(self, agent_action: DialogAction):
         """
