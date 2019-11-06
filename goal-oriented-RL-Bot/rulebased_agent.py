@@ -1,6 +1,5 @@
 import random
-from dialogue_config import RULE_REQUESTS, AGENT_ACTIONS, map_action_to_index, \
-    DialogAction
+from dialogue_config import RULE_REQUESTS, AGENT_ACTIONS, DialogAction
 
 
 class RuleBasedAgent:
@@ -40,3 +39,13 @@ class RuleBasedAgent:
 
         index = map_action_to_index(rule_response)
         return index
+
+
+def map_action_to_index(response):
+    for (i, action) in enumerate(AGENT_ACTIONS):
+        if response == action:
+            return i
+    raise ValueError("Response: {} not found in possible actions".format(response))
+
+# def map_action_to_index(response):
+#     return action2idx[json.dumps(response)]

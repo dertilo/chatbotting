@@ -149,13 +149,3 @@ action2idx = {json.dumps(v.__dict__):k for k,v in idx2action.items()}
 
 def map_index_to_action(index):
     return copy.deepcopy(idx2action[index])
-
-def map_action_to_index(response):
-    for (i, action) in enumerate(AGENT_ACTIONS):
-        if response == action:
-            return i
-    raise ValueError("Response: {} not found in possible actions".format(response))
-
-
-# def map_action_to_index(response):
-#     return action2idx[json.dumps(response)]
