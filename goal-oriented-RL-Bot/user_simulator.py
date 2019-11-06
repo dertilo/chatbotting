@@ -24,7 +24,7 @@ class UserGoal(NamedTuple):
 
 
 @dataclass
-class DialogState: # TODO(tilo): is this really needed?
+class DialogState:  # TODO(tilo): is this really needed?
     intent: str
     history_slots: Dict[str, str]
     inform_slots: Dict[str, str]
@@ -183,7 +183,7 @@ class UserSimulator:
         agent_request_key = list(agent_action.request_slots.keys())[0]
 
         if self.agent_requests_slot_that_user_wants_to_inform_about(agent_request_key):
-            self.handle_agent_request(agent_request_key)
+            self.handle_meaningful_agent_request(agent_request_key)
         elif self.agent_requests_what_he_already_informed_about(agent_request_key):
             self.inform_agent_about_what_he_should_know(agent_request_key)
         elif self.agent_asks_for_what_user_wants_to_ask(agent_request_key):
@@ -241,7 +241,7 @@ class UserSimulator:
         self.state.request_slots.clear()
         assert agent_request_key not in self.state.rest_slots
 
-    def handle_agent_request(self, agent_request_key):
+    def handle_meaningful_agent_request(self, agent_request_key):
         # First Case: if agent requests for something that is in the user sims goal inform slots, then inform it
         self.state.intent = "inform"
         self.state.inform_slots[agent_request_key] = self.goal.inform_slots[
@@ -253,69 +253,63 @@ class UserSimulator:
             agent_request_key
         ]
 
+    def agent_offers_new_information(self, agent_inform_key, agent_inform_value):
+        return agent_inform_value != self.goal.inform_slots.get(
+            agent_inform_key, agent_inform_value
+        )
+
     def _response_to_inform(self, agent_action: DialogAction):
-        """
-        Augments the state in response to the agent action having an intent of inform.
 
-        There are 2 main cases for responding. Add the agent inform slots to history slots,
-        and remove the agent inform slots from the rest and request slots.
-
-        Parameters:
-            agent_action (dict): Intent of inform with standard action format (including 'speaker': 'Agent' and
-                                 'round_num': int)
-        """
-
-        agent_inform_key = list(agent_action.inform_slots.keys())[0]
-        agent_inform_value = agent_action.inform_slots[agent_inform_key]
+        agent_inform_key, agent_inform_value = list(agent_action.inform_slots.items())[
+            0
+        ]
 
         assert agent_inform_key != self.default_key
 
-        # Add all informs (by agent too) to hist slots
         self.state.history_slots[agent_inform_key] = agent_inform_value
-        # Remove from rest slots if in it
         self.state.rest_slots.pop(agent_inform_key, None)
-        # Remove from request slots if in it
         self.state.request_slots.pop(agent_inform_key, None)
 
-        # First Case: If agent informs something that is in goal informs and the value it informed doesnt match,
-        # then inform the correct value
-        if agent_inform_value != self.goal.inform_slots.get(
-            agent_inform_key, agent_inform_value
-        ):
-            self.state.intent = "inform"
-            self.state.inform_slots[agent_inform_key] = self.goal.inform_slots[
-                agent_inform_key
-            ]
-            self.state.request_slots.clear()
-            self.state.history_slots[agent_inform_key] = self.goal.inform_slots[
-                agent_inform_key
-            ]
-        # Second Case: Otherwise pick a random action to take
-        else:
-            # - If anything in state requests then request it
-            if self.state.request_slots:
-                self.state.intent = "request"
-            # - Else if something to say in rest slots, pick something
-            elif self.state.rest_slots:
-                def_in = self.state.rest_slots.pop(self.default_key, False)
-                if self.state.rest_slots:
-                    key, value = random.choice(list(self.state.rest_slots.items()))
-                    if value != "UNK":
-                        self.state.intent = "inform"
-                        self.state.inform_slots[key] = value
-                        self.state.rest_slots.pop(key)
-                        self.state.history_slots[key] = value
-                    else:
-                        self.state.intent = "request"
-                        self.state.request_slots[key] = "UNK"
+        if self.agent_offers_new_information(agent_inform_key, agent_inform_value):
+            self.handle_the_meaningful_inform(agent_inform_key)
+        else: # Second Case: Otherwise pick a random action to take
+            self.handle_meaningless_inform()
+
+    def handle_meaningless_inform(self):
+        # - If anything in state requests then request it
+        if len(self.state.request_slots)>0:
+            self.state.intent = "request"
+        # - Else if something to say in rest slots, pick something
+        elif self.state.rest_slots:
+            def_in = self.state.rest_slots.pop(self.default_key, False)
+            if self.state.rest_slots:
+                key, value = random.choice(list(self.state.rest_slots.items()))
+                if value != "UNK":
+                    self.state.intent = "inform"
+                    self.state.inform_slots[key] = value
+                    self.state.rest_slots.pop(key)
+                    self.state.history_slots[key] = value
                 else:
                     self.state.intent = "request"
-                    self.state.request_slots[self.default_key] = "UNK"
-                if def_in == "UNK":
-                    self.state.rest_slots[self.default_key] = "UNK"
-            # - Otherwise respond with 'nothing to say' intent
+                    self.state.request_slots[key] = "UNK"
             else:
-                self.state.intent = "thanks"
+                self.state.intent = "request"
+                self.state.request_slots[self.default_key] = "UNK"
+            if def_in == "UNK":
+                self.state.rest_slots[self.default_key] = "UNK"
+        # - Otherwise respond with 'nothing to say' intent
+        else:
+            self.state.intent = "thanks"
+
+    def handle_the_meaningful_inform(self, agent_inform_key):
+        self.state.intent = "inform"
+        self.state.inform_slots[agent_inform_key] = self.goal.inform_slots[
+            agent_inform_key
+        ]
+        self.state.request_slots.clear()
+        self.state.history_slots[agent_inform_key] = self.goal.inform_slots[
+            agent_inform_key
+        ]
 
     def _response_to_match_found(self, agent_action: DialogAction):
         """
