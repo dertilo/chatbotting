@@ -61,7 +61,7 @@ def train_agent(
     experience_iterator = iter(experience_generator(agent, dialog_env))
     exp_it = itertools.chain(*[warmup_experience_iterator,experience_iterator])
 
-    with tqdm(postfix=[{"reward": 0.0}]) as pbar:
+    with tqdm(postfix=[{"running_reward": 0.0}]) as pbar:
 
         for it in range(train_steps):
             with torch.no_grad():
@@ -74,7 +74,7 @@ def train_agent(
             optimizer.zero_grad()
             loss_value.backward()
             optimizer.step()
-            update_progess_bar(pbar, {"reward": float(np.mean(exp["next_reward"]))})
+            update_progess_bar(pbar, {"running_reward": float(np.mean(exp["next_reward"]))})
 
 
 if __name__ == "__main__":

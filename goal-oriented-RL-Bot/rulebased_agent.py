@@ -16,7 +16,7 @@ class RuleBasedAgent:
         self.rule_current_slot_index = 0
         self.rule_phase = "not done"
 
-    def step(self, _):
+    def step(self, _,eps=None):
         if self.eps > random.random():
             action =  random.randint(0, self.num_actions - 1)
         else:

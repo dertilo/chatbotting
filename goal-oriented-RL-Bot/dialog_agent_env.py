@@ -58,6 +58,8 @@ class DialogManagerAgent(nn.Module):
         actions = self.step_batch(obs_batch, eps)
         return int(actions.numpy()[0])
 
+    def reset(self):
+        pass
 
 class DialogEnv(gym.Env):
     def __init__(
@@ -102,10 +104,13 @@ def experience_generator(
     num_max_steps=30,
     max_it=sys.maxsize,
 ):
+    eps = 1.0
     for i in range(max_it):
         state = dialog_env.reset()
+        agent.reset()
+        eps*=0.995
         for turn in range(1, num_max_steps + 1):
-            action = agent.step(state)
+            action = agent.step(state,eps=eps)
             next_state, reward, done, success = dialog_env.step(action)
 
             yield {
