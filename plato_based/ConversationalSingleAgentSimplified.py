@@ -7,9 +7,7 @@ from ConversationalAgent import ConversationalAgent
 from AgendaBasedUS import AgendaBasedUS
 from ErrorModel import ErrorModel
 import DialogueManager_simplified as DialogueManager
-from slot_filling_reward_function import (
-    SlotFillingReward,
-)
+from slot_filling_reward_function import SlotFillingReward
 from DialogueEpisodeRecorder import DialogueEpisodeRecorder
 
 from copy import deepcopy
@@ -18,18 +16,19 @@ import os
 import random
 
 
-def validate_configuration(configuration):
-    if not configuration["GENERAL"]:
-        raise ValueError("Cannot run Plato without GENERAL settings!")
+def build_domain_settings(configuration):
 
-    elif not configuration["GENERAL"]["interaction_mode"]:
-        raise ValueError("Cannot run Plato without an " "interaction mode!")
+    domain = configuration["DIALOGUE"]["domain"]
+    assert os.path.isfile(configuration["DIALOGUE"]["ontology_path"])
 
-    elif not configuration["DIALOGUE"]:
-        raise ValueError("Cannot run Plato without DIALOGUE settings!")
+    ontology = Ontology.Ontology(configuration["DIALOGUE"]["ontology_path"])
+    assert os.path.isfile(configuration["DIALOGUE"]["db_path"])
 
-    elif not configuration["AGENT_0"]:
-        raise ValueError("Cannot run Plato without at least " "one agent!")
+    cache_sql_results = False
+    database = DataBase.SQLDataBase(
+        configuration["DIALOGUE"]["db_path"], cache_sql_results
+    )
+    return domain, ontology, database
 
 
 class ConversationalSingleAgent(ConversationalAgent):
@@ -51,8 +50,6 @@ class ConversationalSingleAgent(ConversationalAgent):
     def __init__(self, configuration):
 
         super(ConversationalSingleAgent, self).__init__()
-
-        configuration = configuration
 
         # There is only one agent in this setting
         self.agent_id = 0
@@ -111,9 +108,8 @@ class ConversationalSingleAgent(ConversationalAgent):
         )
 
     def digest_configuration(self, configuration):
-        validate_configuration(configuration)
 
-        self.build_domain_settings(configuration)
+        self.domain, self.ontology, self.database = build_domain_settings(configuration)
         self.build_general_settings(configuration)
         self.user_simulator = AgendaBasedUS(
             goal_generator=Goal.GoalGenerator(self.ontology, self.database, None),
@@ -147,59 +143,6 @@ class ConversationalSingleAgent(ConversationalAgent):
                     self.recorder.set_path(dialogues_path)
                     self.SAVE_LOG = bool(
                         configuration["GENERAL"]["experience_logs"]["save"]
-                    )
-
-    def build_domain_settings(self, configuration):
-        if "DIALOGUE" in configuration and configuration["DIALOGUE"]:
-
-            if configuration["DIALOGUE"]["domain"]:
-                self.domain = configuration["DIALOGUE"]["domain"]
-
-            if configuration["DIALOGUE"]["ontology_path"]:
-                if os.path.isfile(configuration["DIALOGUE"]["ontology_path"]):
-                    self.ontology = Ontology.Ontology(
-                        configuration["DIALOGUE"]["ontology_path"]
-                    )
-                else:
-                    raise FileNotFoundError(
-                        "Domain file %s not found"
-                        % configuration["DIALOGUE"]["ontology_path"]
-                    )
-
-            if configuration["DIALOGUE"]["db_path"]:
-                if os.path.isfile(configuration["DIALOGUE"]["db_path"]):
-                    if "db_type" in configuration["DIALOGUE"]:
-                        if configuration["DIALOGUE"]["db_type"] == "sql":
-                            cache_sql_results = False
-                            if "cache_sql_results" in configuration["DIALOGUE"]:
-                                cache_sql_results = bool(
-                                    configuration["DIALOGUE"]["cache_sql_results"]
-                                )
-                            self.database = DataBase.SQLDataBase(
-                                configuration["DIALOGUE"]["db_path"], cache_sql_results
-                            )
-                        else:
-                            self.database = DataBase.DataBase(
-                                configuration["DIALOGUE"]["db_path"]
-                            )
-                    else:
-                        # Default to SQL
-                        self.database = DataBase.SQLDataBase(
-                            configuration["DIALOGUE"]["db_path"]
-                        )
-                else:
-                    raise FileNotFoundError(
-                        "Database file %s not found"
-                        % configuration["DIALOGUE"]["db_path"]
-                    )
-
-            if "goals_path" in configuration["DIALOGUE"]:
-                if os.path.isfile(configuration["DIALOGUE"]["goals_path"]):
-                    self.goals_path = configuration["DIALOGUE"]["goals_path"]
-                else:
-                    raise FileNotFoundError(
-                        "Goals file %s not found"
-                        % configuration["DIALOGUE"]["goals_path"]
                     )
 
     def initialize(self):
