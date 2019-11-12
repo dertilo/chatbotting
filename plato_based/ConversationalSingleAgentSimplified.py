@@ -180,7 +180,7 @@ class ConversationalSingleAgent(ConversationalAgent):
                 self.dialogue_manager.train(minibatch)
 
         self.dialogue_episode += 1
-        self.cumulative_rewards += self.recorder.dialogues[-1][-1]["cumulative_reward"]
+        self.cumulative_rewards += self.recorder.dialogues[-1][-1].cumulative_reward
 
         if self.dialogue_turn > 0:
             self.total_dialogue_turns += self.dialogue_turn
@@ -189,7 +189,7 @@ class ConversationalSingleAgent(ConversationalAgent):
             self.dialogue_manager.save()
 
         # Count successful dialogues
-        dialogue_success = self.recorder.dialogues[-1][-1]["success"]
+        dialogue_success = self.recorder.dialogues[-1][-1].success
         if dialogue_success:
             self.num_successful_dialogues += int(dialogue_success)
 
