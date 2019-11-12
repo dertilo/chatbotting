@@ -26,34 +26,9 @@ def run_single_agent(config, num_dialogues):
 
             ca.end_dialogue()
 
-            pbar.postfix[0]["dialogue"] = dialogue
-            success = int(ca.recorder.dialogues[-1][-1]["success"])
-            reward = int(ca.recorder.dialogues[-1][-1]["cumulative_reward"])
-            pbar.postfix[0]["success-rate"] = round(
-                running_factor * pbar.postfix[0]["success-rate"]
-                + (1 - running_factor) * success,
-                2,
-            )
-            pbar.postfix[0]["reward"] = round(
-                running_factor * pbar.postfix[0]["reward"]
-                + (1 - running_factor) * reward,
-                2,
-            )
-            pbar.update()
+            update_progress_bar(ca, dialogue, pbar, running_factor)
 
-    # Collect statistics
-    statistics = {"AGENT_0": {}}
-
-    statistics["AGENT_0"]["dialogue_success_percentage"] = 100 * float(
-        ca.num_successful_dialogues / num_dialogues
-    )
-    statistics["AGENT_0"]["avg_cumulative_rewards"] = float(
-        ca.cumulative_rewards / num_dialogues
-    )
-    statistics["AGENT_0"]["avg_turns"] = float(ca.total_dialogue_turns / num_dialogues)
-    statistics["AGENT_0"]["objective_task_completion_percentage"] = 100 * float(
-        ca.num_task_success / num_dialogues
-    )
+    statistics = collect_statistics(ca, num_dialogues)
 
     print(
         "\n\nDialogue Success Rate: {0}\nAverage Cumulative Reward: {1}"
@@ -67,13 +42,39 @@ def run_single_agent(config, num_dialogues):
     return statistics
 
 
-def arg_parse(cfg_filename: str = "config/train_reinforce.yaml"):
-    """
-    This function will parse the configuration file that was provided as a
-    system argument into a dictionary.
+def collect_statistics(ca, num_dialogues):
+    statistics = {"AGENT_0": {}}
+    statistics["AGENT_0"]["dialogue_success_percentage"] = 100 * float(
+        ca.num_successful_dialogues / num_dialogues
+    )
+    statistics["AGENT_0"]["avg_cumulative_rewards"] = float(
+        ca.cumulative_rewards / num_dialogues
+    )
+    statistics["AGENT_0"]["avg_turns"] = float(ca.total_dialogue_turns / num_dialogues)
+    statistics["AGENT_0"]["objective_task_completion_percentage"] = 100 * float(
+        ca.num_task_success / num_dialogues
+    )
+    return statistics
 
-    :return: a dictionary containing the parsed config file.
-    """
+
+def update_progress_bar(ca, dialogue, pbar, running_factor):
+    pbar.postfix[0]["dialogue"] = dialogue
+    success = int(ca.recorder.dialogues[-1][-1]["success"])
+    reward = int(ca.recorder.dialogues[-1][-1]["cumulative_reward"])
+    pbar.postfix[0]["success-rate"] = round(
+        running_factor * pbar.postfix[0]["success-rate"]
+        + (1 - running_factor) * success,
+        2,
+    )
+    pbar.postfix[0]["reward"] = round(
+        running_factor * pbar.postfix[0]["reward"]
+        + (1 - running_factor) * reward,
+        2,
+    )
+    pbar.update()
+
+
+def arg_parse(cfg_filename: str = "config/train_reinforce.yaml"):
 
     random.seed(time.time())
 
