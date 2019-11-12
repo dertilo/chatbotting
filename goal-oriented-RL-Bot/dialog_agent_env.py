@@ -31,6 +31,7 @@ class DialogManagerAgent(nn.Module):
     def __init__(self, obs_space, action_space):
         super().__init__()
         self.num_actions = action_space.n
+        self.exploration_rate = 1.0
         n_hid = 32
         self.nn = nn.Sequential(
             *[
@@ -47,19 +48,22 @@ class DialogManagerAgent(nn.Module):
         q_values = self.nn(observation_tensor)
         return q_values
 
-    def step_batch(self, obs_batch, eps=0.01):
+    def step_batch(self, obs_batch):
         q_values = self.calc_q_values(obs_batch)
         policy_actions = q_values.argmax(dim=1)
-        actions = mix_in_some_random_actions(policy_actions, eps, self.num_actions)
+        actions = mix_in_some_random_actions(
+            policy_actions, self.exploration_rate, self.num_actions
+        )
         return actions
 
-    def step(self, obs, eps=0.1):
+    def step(self, obs):
         obs_batch = np.expand_dims(obs, 0)
-        actions = self.step_batch(obs_batch, eps)
+        actions = self.step_batch(obs_batch)
         return int(actions.numpy()[0])
 
     def reset(self):
         pass
+
 
 class DialogEnv(gym.Env):
     def __init__(
@@ -80,7 +84,7 @@ class DialogEnv(gym.Env):
             self.state_tracker.get_state_size()
         )
 
-    def step(self, agent_action_index:int):
+    def step(self, agent_action_index: int):
         agent_action = map_index_to_action(agent_action_index)
         self.state_tracker.update_state_agent(agent_action)
         user_action, reward, done, success = self.user.step(agent_action)
@@ -104,13 +108,11 @@ def experience_generator(
     num_max_steps=30,
     max_it=sys.maxsize,
 ):
-    eps = 1.0
     for i in range(max_it):
         state = dialog_env.reset()
         agent.reset()
-        eps*=0.995
         for turn in range(1, num_max_steps + 1):
-            action = agent.step(state,eps=eps)
+            action = agent.step(state)
             next_state, reward, done, success = dialog_env.step(action)
 
             yield {

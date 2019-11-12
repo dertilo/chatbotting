@@ -14,7 +14,6 @@ import re
 
 
 class DQNAgent:
-
     def __init__(self, state_size, constants):
 
         self.C = constants["agent"]
@@ -86,7 +85,7 @@ class DQNAgent:
         else:
             return self.beh_model.predict(states)
 
-    def train(self,experience:Experience):
+    def train(self, experience: Experience):
         """
         Trains the agent by improving the behavior model given the memory tuples.
 

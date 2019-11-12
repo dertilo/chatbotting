@@ -5,8 +5,7 @@ from dialogue_config import usersim_intents, DialogAction
 
 
 class ErrorModelController:
-
-    def __init__(self, slot2values:Dict[str,List[str]], emc_params):
+    def __init__(self, slot2values: Dict[str, List[str]], emc_params):
 
         self.slot2values = slot2values
         self.slot_error_prob = emc_params["slot_error_prob"]
@@ -14,7 +13,7 @@ class ErrorModelController:
         self.intent_error_prob = emc_params["intent_error_prob"]
         self.intents = usersim_intents
 
-    def infuse_error(self, action:DialogAction):
+    def infuse_error(self, action: DialogAction):
         """
         Takes a semantic frame/action as a dict and adds 'error'.
 

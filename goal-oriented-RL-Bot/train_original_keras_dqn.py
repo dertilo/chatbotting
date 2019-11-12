@@ -5,7 +5,6 @@ from tqdm import tqdm
 
 from Experience import Experience
 from dialog_agent_env import DialogEnv, load_data
-from dialogue_config import map_index_to_action
 from original_keras_dqn_agent import DQNAgent
 from rulebased_agent import RuleBasedAgent
 
@@ -19,11 +18,10 @@ def run_dialog_episode(
     turn = 0
     reward_sum = 0
     for turn in range(1, num_max_steps + 1):
-        agent_action_index = agent.step(state)
-        agent_action = map_index_to_action(agent_action_index)
-        next_state, reward, done, success = dialog_env.step(agent_action)
+        action = agent.step(state)
+        next_state, reward, done, success = dialog_env.step(action)
 
-        experience.add_experience(state, agent_action_index, next_state, reward, done)
+        experience.add_experience(state, action, next_state, reward, done)
 
         state = next_state
         reward_sum += reward
@@ -70,18 +68,13 @@ def run_train(
                 dqn_agent.update_target_model_weights()
                 dqn_agent.train(experience)
 
-                update_progess_bar(
-                    pbar, dialog_counter, reward_sum / dialog_counter, running_factor
-                )
+                update_progess_bar(pbar, dialog_counter, reward_sum / train_freq)
+                reward_sum = 0
 
 
-def update_progess_bar(pbar, dialog_counter, dialog_reward, running_factor):
+def update_progess_bar(pbar, dialog_counter, dialog_reward):
     pbar.postfix[0]["dialogue"] = dialog_counter
-    pbar.postfix[0]["dialog_reward"] = round(
-        running_factor * pbar.postfix[0]["dialog_reward"]
-        + (1 - running_factor) * dialog_reward,
-        2,
-    )
+    pbar.postfix[0]["dialog_reward"] = dialog_reward
     pbar.update()
 
 
@@ -143,8 +136,7 @@ if __name__ == "__main__":
 
     SUCCESS_RATE_THRESHOLD = train_params["success_rate_threshold"]
     start = time()
-    warmup_run(rule_agent, dialog_env, experience, 10_000)
-    # num_episodes = train_params["num_ep_run"]
+    warmup_run(rule_agent, dialog_env, experience, 1_000)
     num_episodes = 4000
     run_train(
         dqn_agent, dialog_env, experience, num_episodes, train_params["train_freq"]

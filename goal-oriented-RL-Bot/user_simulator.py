@@ -131,7 +131,9 @@ class UserSimulator:
             speaker=USER,
         )
 
-        reward = reward_function(success, self.max_round)
+        reward = reward_function(
+            success, self.max_round
+        )  # TODO(tilo): reward-calculation must not be done by user!
 
         return user_response, reward, done, True if success is 1 else False
 
@@ -333,7 +335,9 @@ class UserSimulator:
 
     def check_if_matches_goal(self, datum: dict):
         slots_that_must_match = list(
-            filter(lambda kv: kv[0] not in self.no_query, self.goal.inform_slots.items())
+            filter(
+                lambda kv: kv[0] not in self.no_query, self.goal.inform_slots.items()
+            )
         )
 
         if any([value != datum.get(key, None) for key, value in slots_that_must_match]):

@@ -4,7 +4,7 @@ class Experience(object):
         self.memory_index = 0
         self.max_memory_size = max_memory_size
 
-    def add_experience(self,state, action_index, next_state, reward,done):
+    def add_experience(self, state, action_index, next_state, reward, done):
         if len(self.memory) < self.max_memory_size:
             self.memory.append(None)
         self.memory[self.memory_index] = (state, action_index, reward, next_state, done)

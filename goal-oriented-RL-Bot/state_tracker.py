@@ -134,7 +134,7 @@ class StateTracker:
         agent_action.turn = self.round_num
         self.history.append(agent_action)
 
-    def handle_match_found(self, agent_action:DialogAction):
+    def handle_match_found(self, agent_action: DialogAction):
         # If intent is match_found then fill the action informs with the matches informs (if there is a match)
         assert agent_action.inform_slots is None
         db_results = self.db_helper.get_db_results(self.current_informs)

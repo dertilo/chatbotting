@@ -56,16 +56,23 @@ def train_agent(
     train_steps=3_000,
     batch_size=32,
 ):
-    optimizer = RMSprop(agent.parameters(),lr=1e-3)
-    warmup_experience_iterator = iter(experience_generator(rule_agent, dialog_env,max_it=1000))
+    optimizer = RMSprop(agent.parameters(), lr=1e-2)
+    warmup_experience_iterator = iter(
+        experience_generator(rule_agent, dialog_env, max_it=1000)
+    )
     experience_iterator = iter(experience_generator(agent, dialog_env))
-    exp_it = itertools.chain(*[warmup_experience_iterator,experience_iterator])
+    exp_it = itertools.chain(*[warmup_experience_iterator, experience_iterator])
+
+    agent.exploration_rate = 1.0
+    min_eps = 0.01
+    exploration_decay = np.exp(np.log(min_eps) / train_steps)
 
     with tqdm(postfix=[{"running_reward": 0.0}]) as pbar:
 
         for it in range(train_steps):
             with torch.no_grad():
                 agent.eval()
+                agent.exploration_rate *= exploration_decay
                 exp = gather_experience(exp_it, batch_size=batch_size)
                 estimated_return = calc_estimated_return(agent, exp)
 
@@ -74,7 +81,9 @@ def train_agent(
             optimizer.zero_grad()
             loss_value.backward()
             optimizer.step()
-            update_progess_bar(pbar, {"running_reward": float(np.mean(exp["next_reward"]))})
+            update_progess_bar(
+                pbar, {"running_reward": float(np.mean(exp["next_reward"]))}
+            )
 
 
 if __name__ == "__main__":
@@ -105,4 +114,4 @@ if __name__ == "__main__":
 
     # experience_iterator = iter(experience_generator(agent, dialog_env))
     # batch = gather_experience(experience_iterator)
-    train_agent(rule_agent,agent, dialog_env, 10_000)
+    train_agent(rule_agent, agent, dialog_env, 10_000)

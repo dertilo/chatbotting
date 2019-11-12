@@ -25,7 +25,7 @@ usersim_required_init_inform_keys = ["moviename"]
 # Agent Config
 #######################################
 USER = "USER"
-AGENT = 'AGENT'
+AGENT = "AGENT"
 
 # Possible inform and request slots for the agent
 agent_inform_slots = [
@@ -71,13 +71,14 @@ agent_request_slots = [
     "numberofkids",
 ]
 
+
 @dataclass
-class DialogAction: # should be (NamedTuple)
+class DialogAction:  # should be (NamedTuple)
     intent: str
     inform_slots: Dict[str, str] = None
     request_slots: Dict[str, str] = None
-    turn:int = 0
-    speaker:str= AGENT
+    turn: int = 0
+    speaker: str = AGENT
 
 
 inform_actions = [
@@ -86,12 +87,13 @@ inform_actions = [
     if slot != usersim_default_key
 ]
 request_actions = [
-    DialogAction("request", request_slots={slot: "UNK"})
-    for slot in agent_request_slots
+    DialogAction("request", request_slots={slot: "UNK"}) for slot in agent_request_slots
 ]
 
 AGENT_ACTIONS = (
-        [DialogAction("done"), DialogAction("match_found")] + inform_actions + request_actions
+    [DialogAction("done"), DialogAction("match_found")]
+    + inform_actions
+    + request_actions
 )
 
 
@@ -144,8 +146,9 @@ all_slots = [
     "mc_list",
 ]
 
-idx2action={i:a for i,a in enumerate(AGENT_ACTIONS)}
-action2idx = {json.dumps(v.__dict__):k for k,v in idx2action.items()}
+idx2action = {i: a for i, a in enumerate(AGENT_ACTIONS)}
+action2idx = {json.dumps(v.__dict__): k for k, v in idx2action.items()}
+
 
 def map_index_to_action(index):
     return copy.deepcopy(idx2action[index])

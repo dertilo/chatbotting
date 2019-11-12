@@ -23,7 +23,7 @@ class DBQuery:
         self.no_query = no_query_keys
         self.match_key = usersim_default_key
 
-    def get_inform_value(self, slot_name, current_inform_slots)->str:
+    def get_inform_value(self, slot_name, current_inform_slots) -> str:
 
         key = slot_name
 
@@ -66,7 +66,7 @@ class DBQuery:
                 slot_values[slot_value] += 1
         return slot_values
 
-    def get_db_results(self, constraints:Dict[str,Any]):
+    def get_db_results(self, constraints: Dict[str, Any]):
 
         constraints = {
             k: v
