@@ -8,6 +8,7 @@ You may obtain a copy of the License at the root directory of this project.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+import Ontology
 
 __author__ = "Alexandros Papangelis"
 
@@ -17,9 +18,8 @@ import os
 import pickle
 import random
 
-from Dialogue.Action import DialogueActItem, Operator
-from Domain import Ontology
-from Domain.DataBase import DataBase, SQLDataBase, JSONDataBase
+from Action import DialogueActItem, Operator
+from DataBase import DataBase, SQLDataBase, JSONDataBase
 
 """
 The Goal represents Simulated Usr goals, that are composed of a set of 

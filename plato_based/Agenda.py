@@ -8,11 +8,11 @@ You may obtain a copy of the License at the root directory of this project.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
-from UserSimulator.AgendaBasedUserSimulator.Goal import Goal
+from Goal import Goal
 
 __author__ = "Alexandros Papangelis"
 
-from Dialogue.Action import DialogueAct, DialogueActItem, Operator
+from Action import DialogueAct, DialogueActItem, Operator
 
 """
 The Agenda is a stack-like implementation of the Simulated Usr's agenda. 
