@@ -8,6 +8,11 @@ You may obtain a copy of the License at the root directory of this project.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+from dataclasses import dataclass
+from typing import List
+
+from Action import DialogueAct
+from State import SlotFillingDialogueState
 
 __author__ = "Alexandros Papangelis"
 
@@ -24,20 +29,16 @@ other information we may want to keep track of.
 """
 
 
+@dataclass
+class TurnState:
+    state: SlotFillingDialogueState = None
+    action: List[DialogueAct] = None
+    reward: float = None
+    success: bool = None
+
+
 class DialogueEpisodeRecorder:
-    """
-    Will record all interactions of the dialogue system, after each dialogue
-    turn.
-    """
-
     def __init__(self, size=None, path=None):
-        """
-        Initializes the Dialogue Episode Recorder
-
-        :param size: size of the experience (how many dialogues to store)
-        :param path: path to save / load the experience
-
-        """
         self.dialogues = []
         self.size = size
         self.current_dialogue = None
@@ -48,21 +49,12 @@ class DialogueEpisodeRecorder:
             self.load(path)
 
     def set_path(self, path):
-        """
-        Sets the path
-
-        :param path: the new path
-        :return: nothing
-        """
         self.path = path
 
     def record(
         self,
-        state,
         new_state,
-        action,
-        reward,
-        success,
+        turnstate: TurnState,
         input_utterance=None,
         output_utterance=None,
         force_terminate=False,
@@ -87,7 +79,7 @@ class DialogueEpisodeRecorder:
         :return: Nothing
         """
         # TODO: what does len(actions)==0 mean ??
-        self.cumulative_reward += reward
+        self.cumulative_reward += turnstate.reward
 
         # Check if a dialogue is starting or ending
         if self.current_dialogue is None:
@@ -95,10 +87,10 @@ class DialogueEpisodeRecorder:
 
         self.current_dialogue.append(
             {
-                "state": deepcopy(state),
+                "state": deepcopy(turnstate.state),
                 "new_state": deepcopy(new_state),
-                "action": deepcopy(action),
-                "reward": deepcopy(reward),
+                "action": deepcopy(turnstate.action),
+                "reward": deepcopy(turnstate.reward),
                 "input_utterance": deepcopy(input_utterance) if input_utterance else "",
                 "output_utterance": deepcopy(output_utterance)
                 if output_utterance
@@ -110,9 +102,9 @@ class DialogueEpisodeRecorder:
             }
         )
 
-        if state.is_terminal() or force_terminate:
-            if success is not None:
-                self.current_dialogue[-1]["success"] = success
+        if turnstate.state.is_terminal() or force_terminate:
+            if turnstate.success is not None:
+                self.current_dialogue[-1]["success"] = turnstate.success
 
             # Check if maximum size has been reached
             if self.size and len(self.dialogues) >= self.size:

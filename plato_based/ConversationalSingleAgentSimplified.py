@@ -8,7 +8,7 @@ from AgendaBasedUS import AgendaBasedUS
 from ErrorModel import ErrorModel
 import DialogueManager_simplified as DialogueManager
 from slot_filling_reward_function import SlotFillingReward
-from DialogueEpisodeRecorder import DialogueEpisodeRecorder
+from DialogueEpisodeRecorder import DialogueEpisodeRecorder, TurnState
 
 from copy import deepcopy
 
@@ -32,21 +32,6 @@ def build_domain_settings(configuration):
 
 
 class ConversationalSingleAgent(ConversationalAgent):
-    """
-    Essentially the dialogue system. Will be able to interact with:
-
-    - Simulated Users via:
-        - Dialogue Acts
-        - Text
-
-    - Human Users via:
-        - Text
-        - Speech
-        - Online crowd?
-
-    - Data
-    """
-
     def __init__(self, configuration):
 
         super(ConversationalSingleAgent, self).__init__()
@@ -83,34 +68,15 @@ class ConversationalSingleAgent(ConversationalAgent):
         self.agent_goal = None
         self.goal_generator = None
 
+        self.prev_turnstate = TurnState()
         self.curr_state = None
-        self.prev_state = None
-        self.curr_state = None
-        self.prev_action = None
-        self.prev_reward = None
-        self.prev_success = None
-        self.prev_task_success = None
 
         self.recorder = DialogueEpisodeRecorder()
 
         # TODO: Handle this properly - get reward function type from config
         self.reward_func = SlotFillingReward()
 
-        self.digest_configuration(configuration)
-
-        self.dialogue_manager = DialogueManager.DialogueManager(
-            configuration,
-            self.ontology,
-            self.database,
-            self.agent_id,
-            "system",
-            configuration["AGENT_0"]["DM"]["policy"],
-        )
-
-    def digest_configuration(self, configuration):
-
         self.domain, self.ontology, self.database = build_domain_settings(configuration)
-        self.build_general_settings(configuration)
         self.user_simulator = AgendaBasedUS(
             goal_generator=Goal.GoalGenerator(self.ontology, self.database, None),
             error_model=ErrorModel(
@@ -121,29 +87,14 @@ class ConversationalSingleAgent(ConversationalAgent):
             ),
         )
 
-    def build_general_settings(self, configuration):
-        if "GENERAL" in configuration and configuration["GENERAL"]:
-            if "experience_logs" in configuration["GENERAL"]:
-                dialogues_path = None
-                if "path" in configuration["GENERAL"]["experience_logs"]:
-                    dialogues_path = configuration["GENERAL"]["experience_logs"]["path"]
-
-                if "load" in configuration["GENERAL"]["experience_logs"] and bool(
-                    configuration["GENERAL"]["experience_logs"]["load"]
-                ):
-                    if dialogues_path and os.path.isfile(dialogues_path):
-                        self.recorder.load(dialogues_path)
-                    else:
-                        raise FileNotFoundError(
-                            "Dialogue Log file %s not found (did you "
-                            "provide one?)" % dialogues_path
-                        )
-
-                if "save" in configuration["GENERAL"]["experience_logs"]:
-                    self.recorder.set_path(dialogues_path)
-                    self.SAVE_LOG = bool(
-                        configuration["GENERAL"]["experience_logs"]["save"]
-                    )
+        self.dialogue_manager = DialogueManager.DialogueManager(
+            configuration,
+            self.ontology,
+            self.database,
+            self.agent_id,
+            "system",
+            configuration["AGENT_0"]["DM"]["policy"],
+        )
 
     def initialize(self):
 
@@ -154,14 +105,8 @@ class ConversationalSingleAgent(ConversationalAgent):
         self.cumulative_rewards = 0
 
         self.dialogue_manager.initialize({})
-
+        self.prev_turnstate = TurnState()
         self.curr_state = None
-        self.prev_state = None
-        self.curr_state = None
-        self.prev_action = None
-        self.prev_reward = None
-        self.prev_success = None
-        self.prev_task_success = None
 
     def start_dialogue(self, args=None):
 
@@ -173,24 +118,13 @@ class ConversationalSingleAgent(ConversationalAgent):
 
         rew, success = self.process_system_action(sys_response)
 
-        self.recorder.record(
-            deepcopy(self.dialogue_manager.get_state()),
-            self.dialogue_manager.get_state(),
-            sys_response,
-            rew,
-            success,
-        )
+        curr_state = self.dialogue_manager.get_state()
+        turnstate = TurnState(curr_state, sys_response, rew, success)
+        self.recorder.record(deepcopy(curr_state), turnstate)
 
         self.dialogue_turn += 1
-
-        self.prev_state = None
-
-        # Re-initialize these for good measure
+        self.prev_turnstate = TurnState()
         self.curr_state = None
-        self.prev_action = None
-        self.prev_reward = None
-        self.prev_success = None
-        self.prev_task_success = None
 
         self.continue_dialogue()
 
@@ -220,37 +154,19 @@ class ConversationalSingleAgent(ConversationalAgent):
 
         rew, success = self.process_system_action(sys_response)
 
-        if self.prev_state:
-            self.recorder.record(
-                self.prev_state,
-                self.curr_state,
-                self.prev_action,
-                self.prev_reward,
-                self.prev_success,
-            )
+        if self.prev_turnstate.state:
+            self.recorder.record(self.curr_state, self.prev_turnstate)
 
         self.dialogue_turn += 1
 
-        self.prev_state = deepcopy(self.curr_state)
-        self.prev_action = deepcopy(sys_response)
-        self.prev_reward = rew
-        self.prev_success = success
+        self.prev_turnstate.state = deepcopy(self.curr_state)
+        self.prev_turnstate.action = deepcopy(sys_response)
+        self.prev_turnstate.reward = rew
+        self.prev_turnstate.success = success
 
     def end_dialogue(self):
-        """
-        Perform final dialogue turn. Train and save models if applicable.
 
-        :return: nothing
-        """
-
-        # Record final state
-        self.recorder.record(
-            self.curr_state,
-            self.curr_state,
-            self.prev_action,
-            self.prev_reward,
-            self.prev_success,
-        )
+        self.recorder.record(self.curr_state, self.prev_turnstate)
 
         if self.dialogue_manager.is_training():
             if (
