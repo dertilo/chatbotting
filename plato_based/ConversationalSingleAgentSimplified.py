@@ -159,28 +159,25 @@ class ConversationalSingleAgent(ConversationalAgent):
 
         self.dialogue_turn += 1
 
-        self.prev_turnstate.state = deepcopy(self.curr_state)
-        self.prev_turnstate.action = deepcopy(sys_response)
-        self.prev_turnstate.reward = rew
-        self.prev_turnstate.success = success
+        self.prev_turnstate = TurnState(
+            deepcopy(self.curr_state), deepcopy(sys_response), rew, success
+        )
 
     def end_dialogue(self):
 
         self.recorder.record(self.curr_state, self.prev_turnstate)
 
-        if self.dialogue_manager.is_training():
-            if (
-                self.dialogue_episode % self.train_interval == 0
-                and len(self.recorder.dialogues) >= self.minibatch_length
-            ):
-                for epoch in range(self.train_epochs):
+        if (
+            self.dialogue_manager.is_training()
+            and self.dialogue_episode % self.train_interval == 0
+            and len(self.recorder.dialogues) >= self.minibatch_length
+        ):
 
-                    # Sample minibatch
-                    minibatch = random.sample(
-                        self.recorder.dialogues, self.minibatch_length
-                    )
-
-                    self.dialogue_manager.train(minibatch)
+            for epoch in range(self.train_epochs):
+                minibatch = random.sample(
+                    self.recorder.dialogues, self.minibatch_length
+                )
+                self.dialogue_manager.train(minibatch)
 
         self.dialogue_episode += 1
         self.cumulative_rewards += self.recorder.dialogues[-1][-1]["cumulative_reward"]
@@ -197,10 +194,4 @@ class ConversationalSingleAgent(ConversationalAgent):
             self.num_successful_dialogues += int(dialogue_success)
 
     def terminated(self):
-        """
-        Check if this agent is at a terminal state.
-
-        :return: True or False
-        """
-
         return self.dialogue_manager.at_terminal_state()
