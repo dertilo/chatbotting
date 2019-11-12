@@ -41,8 +41,8 @@ class Operator(Enum):
 class Action:
     def __init__(self):
         self.name = None
-        self.funcName = None    # Function name to be called, if applicable?
-        self.params = {}        # Dialogue Act Items (slot - operator - value)
+        self.funcName = None  # Function name to be called, if applicable?
+        self.params = {}  # Dialogue Act Items (slot - operator - value)
 
 
 """
@@ -62,17 +62,21 @@ class SummaryAction(Enum):
     REQUEST_X = 9
     NOTHING = 10
 
+
 @dataclass
 class DialogueActItem:
-    slot:str
-    op:Operator
-    value:Any
+    slot: str
+    op: Operator
+    value: Any
 
     def __eq__(self, other):
         # TODO: Will need some kind of constraint satisfaction (with tolerance)
         # to efficiently handle all operators
-        return self.slot == other.slot and self.op == other.op and \
-            self.value == other.value
+        return (
+            self.slot == other.slot
+            and self.op == other.op
+            and self.value == other.value
+        )
 
     def __str__(self):
         """
@@ -81,32 +85,32 @@ class DialogueActItem:
         :return: string
         """
 
-        opr = 'UNK'
+        opr = "UNK"
         if self.op == Operator.EQ:
-            opr = '='
+            opr = "="
         elif self.op == Operator.NE:
-            opr = '!='
+            opr = "!="
         elif self.op == Operator.LT:
-            opr = '<'
+            opr = "<"
         elif self.op == Operator.LE:
-            opr = '<='
+            opr = "<="
         elif self.op == Operator.GT:
-            opr = '>'
+            opr = ">"
         elif self.op == Operator.GE:
-            opr = '>='
+            opr = ">="
         elif self.op == Operator.AND:
-            opr = 'AND'
+            opr = "AND"
         elif self.op == Operator.OR:
-            opr = 'OR'
+            opr = "OR"
         elif self.op == Operator.NOT:
-            opr = 'NOT'
+            opr = "NOT"
         elif self.op == Operator.IN:
-            opr = 'IN'
+            opr = "IN"
 
         result = self.slot
 
         if self.value:
-            result += ' ' + opr + ' ' + self.value
+            result += " " + opr + " " + self.value
 
         return result
 
@@ -117,30 +121,35 @@ class DialogueAct(Action):
     and a list of DialogueActItem parameters, which are triplets of
     <slot, operator, value>.
     """
-    def __init__(self, intent:str, params:List[DialogueActItem]=[]):
+
+    def __init__(self, intent: str, params: List[DialogueActItem] = []):
         super(DialogueAct, self).__init__()
 
-        self.name = 'dialogue_act'
+        self.name = "dialogue_act"
         self.intent = intent
-        self.params:List[DialogueActItem] = params
+        self.params: List[DialogueActItem] = params
 
     def __eq__(self, other):
 
         # TODO: Make the check more efficient
-        return self.funcName == other.funcName and \
-            self.intent == other.intent and \
-            self.name == other.name and \
-            [s for s in self.params if s not in other.params] == []
+        return (
+            self.funcName == other.funcName
+            and self.intent == other.intent
+            and self.name == other.name
+            and [s for s in self.params if s not in other.params] == []
+        )
 
     def __str__(self):
 
         if self.intent:
-            return self.intent + \
-                   '(' + \
-                   ''.join([str(param)+', ' for param in self.params]) + ')'
+            return (
+                self.intent
+                + "("
+                + "".join([str(param) + ", " for param in self.params])
+                + ")"
+            )
         else:
-            return 'None (DialogueAct)'
-
+            return "None (DialogueAct)"
 
 
 """
@@ -150,7 +159,7 @@ them.
 
 
 class Expression:
-    
+
     # An Expression will allow us dialogue acts of the form:
     # inform( 50 < price < 225, food: chinese or italian, ...)
     def __init__(self):
@@ -158,7 +167,6 @@ class Expression:
         Not implemented.
         """
         pass
-
 
 
 # Represents an event of the (simulated) user tapping onto something in the

@@ -21,7 +21,6 @@ adhere to.
 
 
 class DialoguePolicy(ABC):
-
     def initialize(self, **kwargs):
         """
         Initialize internal structures at the beginning of each dialogue

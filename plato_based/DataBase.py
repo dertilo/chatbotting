@@ -44,11 +44,11 @@ class DataBase:
                 self.db_file_name = filename
 
             else:
-                raise FileNotFoundError('Database file %s not found'
-                                        % filename)
+                raise FileNotFoundError("Database file %s not found" % filename)
         else:
-            raise ValueError('Unacceptable value for database file name: %s '
-                             % filename)
+            raise ValueError(
+                "Unacceptable value for database file name: %s " % filename
+            )
 
     @abstractmethod
     def db_lookup(self, dialogue_state):
@@ -90,24 +90,23 @@ class SQLDataBase(DataBase):
 
                 # Get Table name
                 cursor = self.SQL_connection.cursor()
-                result = \
-                    cursor.execute(
-                        "select * from sqlite_master "
-                        "where type = 'table';").fetchall()
+                result = cursor.execute(
+                    "select * from sqlite_master " "where type = 'table';"
+                ).fetchall()
                 if result and result[0] and result[0][1]:
                     self.db_table_name = result[0][1]
                 else:
                     raise ValueError(
-                        'Dialogue Manager cannot specify Table Name from '
-                        'database {0}'.format(
-                            self.db_file_name))
+                        "Dialogue Manager cannot specify Table Name from "
+                        "database {0}".format(self.db_file_name)
+                    )
 
             else:
-                raise FileNotFoundError('Database file %s not found'
-                                        % filename)
+                raise FileNotFoundError("Database file %s not found" % filename)
         else:
-            raise ValueError('Unacceptable value for database file name: %s '
-                             % filename)
+            raise ValueError(
+                "Unacceptable value for database file name: %s " % filename
+            )
 
     def db_lookup(self, DState, MAX_DB_RESULTS=None):
         """
@@ -121,17 +120,16 @@ class SQLDataBase(DataBase):
         cursor = self.SQL_connection.cursor()
         sql_command = " SELECT * FROM " + self.db_table_name + " "
 
-        args = ''
+        args = ""
         prev_arg = False
         prev_query_arg = False
         # Impose constraints
         for slot in DState.slots_filled:
-            if DState.slots_filled[slot] and DState.slots_filled[slot] != \
-                    'dontcare':
+            if DState.slots_filled[slot] and DState.slots_filled[slot] != "dontcare":
                 if prev_arg:
                     args += " AND "
 
-                args += slot + " = \"" + DState.slots_filled[slot] + "\""
+                args += slot + ' = "' + DState.slots_filled[slot] + '"'
                 prev_arg = True
 
         if args:
@@ -152,8 +150,6 @@ class SQLDataBase(DataBase):
                     result.append(dict(zip(slot_names, db_item)))
             self.result_cache[sql_command] = result
 
-
-
         if MAX_DB_RESULTS:
             return result[:MAX_DB_RESULTS]
         else:
@@ -167,15 +163,17 @@ class SQLDataBase(DataBase):
         """
 
         cursor = self.SQL_connection.cursor()
-        result = cursor.execute("select * from sqlite_master "
-                                "where type = 'table';").fetchall()
+        result = cursor.execute(
+            "select * from sqlite_master " "where type = 'table';"
+        ).fetchall()
 
         if result and result[0] and result[0][1]:
             db_table_name = result[0][1]
         else:
             raise ValueError(
-                'Dialogue State Tracker cannot specify Table Name from '
-                'database {0}'.format(self.db_file_name))
+                "Dialogue State Tracker cannot specify Table Name from "
+                "database {0}".format(self.db_file_name)
+            )
 
         return db_table_name
 
@@ -204,4 +202,4 @@ class JSONDataBase(DataBase):
         :return: the table name
         """
 
-        return ''
+        return ""

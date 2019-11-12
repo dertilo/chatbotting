@@ -97,7 +97,7 @@ class ConversationalModule(ABC):
             args = args.content
 
         if not isinstance(args, dict):
-            args = {'args': args}
+            args = {"args": args}
 
         output = self.generate_output(args)
 

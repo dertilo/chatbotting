@@ -1,9 +1,7 @@
 from pprint import pprint
 from tqdm import tqdm
 
-from ConversationalSingleAgentSimplified import (
-    ConversationalSingleAgent,
-)
+from ConversationalSingleAgentSimplified import ConversationalSingleAgent
 
 import yaml
 import os.path
@@ -67,9 +65,7 @@ def update_progress_bar(ca, dialogue, pbar, running_factor):
         2,
     )
     pbar.postfix[0]["reward"] = round(
-        running_factor * pbar.postfix[0]["reward"]
-        + (1 - running_factor) * reward,
-        2,
+        running_factor * pbar.postfix[0]["reward"] + (1 - running_factor) * reward, 2
     )
     pbar.update()
 

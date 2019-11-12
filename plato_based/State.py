@@ -22,7 +22,6 @@ by the DialogueStateTracker.
 """
 
 
-
 class DialogueState:
     def __init__(self):
         """
@@ -68,14 +67,16 @@ class SlotFillingDialogueState(DialogueState):
 
         self.slots = None
 
-        if 'slots' in args:
-            self.slots = deepcopy(args['slots'])
+        if "slots" in args:
+            self.slots = deepcopy(args["slots"])
         else:
-            print('WARNING! SlotFillingDialogueState not provided with slots, '
-                  'using default CamRest slots.')
-            self.slots = ['area', 'food', 'pricerange']
+            print(
+                "WARNING! SlotFillingDialogueState not provided with slots, "
+                "using default CamRest slots."
+            )
+            self.slots = ["area", "food", "pricerange"]
 
-        self.requested_slot = ''
+        self.requested_slot = ""
 
         self.user_acts = None
         self.system_made_offer = False
@@ -98,11 +99,11 @@ class SlotFillingDialogueState(DialogueState):
 
         :return: a string representation of the Slot Filling Dialogue State
         """
-        ret = 'SlotFillingDialogueState\n'
-        ret += 'Slots: ' + str(self.slots_filled) + '\n'
-        ret += 'Requested Slot: ' + self.requested_slot + '\n'
-        ret += 'Sys Made Offer: ' + str(self.system_made_offer) + '\n'
-        ret += 'Turn: ' + str(self.turn) + '\n'
+        ret = "SlotFillingDialogueState\n"
+        ret += "Slots: " + str(self.slots_filled) + "\n"
+        ret += "Requested Slot: " + self.requested_slot + "\n"
+        ret += "Sys Made Offer: " + str(self.system_made_offer) + "\n"
+        ret += "Turn: " + str(self.turn) + "\n"
         return ret
 
     def initialize(self, args=None):
@@ -116,7 +117,7 @@ class SlotFillingDialogueState(DialogueState):
         """
         self.slots_filled = dict.fromkeys(self.slots)
         self.system_requestable_slot_entropies = {}
-        self.requested_slot = ''
+        self.requested_slot = ""
 
         self.user_acts = None
         self.is_terminal_state = False
@@ -135,8 +136,8 @@ class SlotFillingDialogueState(DialogueState):
         self.num_dontcare = 0
 
         # NOTE: This is ONLY used if an agent plays the role of the user
-        if args and 'goal' in args:
-            self.user_goal = deepcopy(args['goal'])
+        if args and "goal" in args:
+            self.user_goal = deepcopy(args["goal"])
         else:
             self.user_goal = None
 
@@ -154,5 +155,6 @@ class Context:
     """
     Not implemented. Class to hold context.
     """
+
     def __init__(self):
         self.params = {}

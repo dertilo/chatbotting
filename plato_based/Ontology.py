@@ -1,7 +1,7 @@
 import json
 
-class Ontology:
 
+class Ontology:
     def __init__(self, filename):
         self.ontology_file_name = filename
         self.load_ontology()

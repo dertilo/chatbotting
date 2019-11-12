@@ -3,9 +3,7 @@ from typing import List
 from dialog_action_classes import DialogueAct, DialogueActItem, Operator
 from DialogueEpisodeRecorder import Experience
 from dummy_dialog_state_tracker import DummyStateTracker
-from ReinforcePolicy import (
-    ReinforcePolicy,
-)
+from ReinforcePolicy import ReinforcePolicy
 
 from Ontology import Ontology
 from DataBase import SQLDataBase
@@ -250,8 +248,8 @@ class DialogueManager(ConversationalModule):
 
         return self.DSTracker.get_state().is_terminal()
 
-    def train(self, dialogues:List[List[Experience]]):
-        assert self.TRAIN_POLICY # TODO(tilo): what is TRAIN_POLICY good for?
+    def train(self, dialogues: List[List[Experience]]):
+        assert self.TRAIN_POLICY  # TODO(tilo): what is TRAIN_POLICY good for?
         self.policy.train(dialogues)
 
     def is_training(self):

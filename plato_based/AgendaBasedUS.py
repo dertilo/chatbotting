@@ -36,7 +36,6 @@ class AgendaBasedUS(object):
         error_model: ErrorModel,
         patience=3,
         pop_distribution=[1.0],
-        goal_slot_selection_weights=None,
     ):
 
         super(AgendaBasedUS, self).__init__()
@@ -44,8 +43,6 @@ class AgendaBasedUS(object):
         self.dialogue_turn = 0
         self.patience = patience
         self.pop_distribution = pop_distribution
-
-        self.goal_slot_selection_weights = goal_slot_selection_weights
 
         self.curr_patience = self.patience
 
@@ -61,9 +58,7 @@ class AgendaBasedUS(object):
 
     def initialize(self):
 
-        self.goal = self.goal_generator.generate(
-            goal_slot_selection_weights=self.goal_slot_selection_weights
-        )
+        self.goal = self.goal_generator.generate()
 
         self.agenda.initialize(deepcopy(self.goal))
 
@@ -88,7 +83,6 @@ class AgendaBasedUS(object):
         self.agenda.consistency_check()
 
     def _reset_requests_dueto_new_offers(self, new_offers: List[DialogueAct]):
-
         def reset_past_requests(system_act):
             self.prev_offer_name = system_act.params[0].value
 
@@ -98,7 +92,6 @@ class AgendaBasedUS(object):
                 item.value = ""
 
         [reset_past_requests(offer_act) for offer_act in new_offers]
-
 
     def _receive_input_handcrafted(self, system_acts):
 

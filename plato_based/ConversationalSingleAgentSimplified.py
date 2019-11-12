@@ -77,7 +77,7 @@ class ConversationalSingleAgent:
 
         self.domain, self.ontology, self.database = build_domain_settings(configuration)
         self.user_simulator = AgendaBasedUS(
-            goal_generator=Goal.GoalGenerator(self.ontology, self.database, None),
+            goal_generator=Goal.GoalGenerator(self.ontology, self.database),
             error_model=ErrorModel(
                 self.ontology,
                 slot_confuse_prob=0.0,
