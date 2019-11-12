@@ -1,6 +1,6 @@
 from typing import List, Dict
 
-from Action import DialogueActItem
+from dialog_action_classes import DialogueActItem
 from State import SlotFillingDialogueState
 from Goal import Goal
 

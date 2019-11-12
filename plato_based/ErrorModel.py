@@ -12,8 +12,7 @@ limitations under the License.
 __author__ = "Alexandros Papangelis"
 
 from Ontology import Ontology
-from DataBase import DataBase
-from Action import Operator
+from dialog_action_classes import Operator
 import random
 
 """

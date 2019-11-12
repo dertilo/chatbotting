@@ -22,30 +22,8 @@ by the DialogueStateTracker.
 """
 
 
-class State(ABC):
 
-    @abstractmethod
-    def initialize(self):
-        """
-        Initialize the state (e.g. at the start of a dialogue)
-
-        :return: nothing
-        """
-
-        pass
-
-    @abstractmethod
-    def is_terminal(self):
-        """
-        Check if this state is terminal
-
-        :return: True or False
-        """
-
-        pass
-
-
-class DialogueState(State):
+class DialogueState:
     def __init__(self):
         """
         Initialize the Dialogue State

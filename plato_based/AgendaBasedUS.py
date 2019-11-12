@@ -4,7 +4,7 @@ from typing import List
 
 import Agenda
 import Goal
-from Action import DialogueAct, DialogueActItem, Operator
+from dialog_action_classes import DialogueAct, DialogueActItem, Operator
 from ErrorModel import ErrorModel
 
 """

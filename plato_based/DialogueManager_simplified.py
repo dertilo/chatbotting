@@ -1,6 +1,6 @@
 from typing import List
 
-from Action import DialogueAct, DialogueActItem, Operator
+from dialog_action_classes import DialogueAct, DialogueActItem, Operator
 from DialogueEpisodeRecorder import Experience
 from dummy_dialog_state_tracker import DummyStateTracker
 from ReinforcePolicy import (

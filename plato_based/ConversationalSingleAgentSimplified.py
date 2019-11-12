@@ -1,8 +1,7 @@
 import DataBase
 import Goal
 import Ontology
-from Action import DialogueAct
-from ConversationalAgent import ConversationalAgent
+from dialog_action_classes import DialogueAct
 
 from AgendaBasedUS import AgendaBasedUS
 from ErrorModel import ErrorModel
@@ -31,10 +30,10 @@ def build_domain_settings(configuration):
     return domain, ontology, database
 
 
-class ConversationalSingleAgent(ConversationalAgent):
+class ConversationalSingleAgent:
     def __init__(self, configuration):
 
-        super(ConversationalSingleAgent, self).__init__()
+        super().__init__()
 
         # There is only one agent in this setting
         self.agent_id = 0

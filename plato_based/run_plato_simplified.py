@@ -59,8 +59,8 @@ def collect_statistics(ca, num_dialogues):
 
 def update_progress_bar(ca, dialogue, pbar, running_factor):
     pbar.postfix[0]["dialogue"] = dialogue
-    success = int(ca.recorder.dialogues[-1][-1]["success"])
-    reward = int(ca.recorder.dialogues[-1][-1]["cumulative_reward"])
+    success = int(ca.recorder.dialogues[-1][-1].success)
+    reward = int(ca.recorder.dialogues[-1][-1].cumulative_reward)
     pbar.postfix[0]["success-rate"] = round(
         running_factor * pbar.postfix[0]["success-rate"]
         + (1 - running_factor) * success,

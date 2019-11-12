@@ -3,7 +3,7 @@ from typing import List
 import DialoguePolicy
 from DialogueEpisodeRecorder import Experience
 from HandcraftedPolicy import HandcraftedPolicy
-from Action import DialogueAct, DialogueActItem, Operator
+from dialog_action_classes import DialogueAct, DialogueActItem, Operator
 from State import SlotFillingDialogueState
 from copy import deepcopy
 

@@ -11,7 +11,7 @@ limitations under the License.
 from dataclasses import dataclass
 from typing import List
 
-from Action import DialogueAct
+from dialog_action_classes import DialogueAct
 from State import SlotFillingDialogueState
 
 __author__ = "Alexandros Papangelis"

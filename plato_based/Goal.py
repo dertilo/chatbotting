@@ -18,7 +18,7 @@ import os
 import pickle
 import random
 
-from Action import DialogueActItem, Operator
+from dialog_action_classes import DialogueActItem, Operator
 from DataBase import DataBase, SQLDataBase, JSONDataBase
 
 """

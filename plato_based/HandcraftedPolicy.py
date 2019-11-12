@@ -1,7 +1,7 @@
 import Ontology
 from State import SlotFillingDialogueState
 from DialoguePolicy import DialoguePolicy
-from Action import DialogueAct, DialogueActItem, Operator
+from dialog_action_classes import DialogueAct, DialogueActItem, Operator
 
 from copy import deepcopy
 

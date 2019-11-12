@@ -12,7 +12,7 @@ from Goal import Goal
 
 __author__ = "Alexandros Papangelis"
 
-from Action import DialogueAct, DialogueActItem, Operator
+from dialog_action_classes import DialogueAct, DialogueActItem, Operator
 
 """
 The Agenda is a stack-like implementation of the Simulated Usr's agenda. 
