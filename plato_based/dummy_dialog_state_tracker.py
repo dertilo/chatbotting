@@ -6,7 +6,7 @@ from copy import deepcopy
 
 
 class DummyStateTracker(object):
-    def __init__(self, ontology, domain):
+    def __init__(self, ontology):
 
         super(DummyStateTracker, self).__init__()
 
@@ -18,19 +18,9 @@ class DummyStateTracker(object):
         else:
             raise ValueError("Unacceptable ontology type %s " % ontology)
 
-        self.domain = domain
-        if domain in ["CamRest", "SlotFilling"]:
-            self.DState = SlotFillingDialogueState(
-                {"slots": self.ontology.ontology["system_requestable"]}
-            )
-        else:
-            print(
-                "Warning! Domain has not been defined. Using Slot-Filling "
-                "Dialogue State"
-            )
-            self.DState = SlotFillingDialogueState(
-                {"slots": self.ontology.ontology["system_requestable"]}
-            )
+        self.DState = SlotFillingDialogueState(
+            {"slots": self.ontology.ontology["system_requestable"]}
+        )
 
     def initialize(self, num_db_items, args=None):
 

@@ -60,7 +60,6 @@ class DialogueManager(ConversationalModule):
         self.policy_path = None
         assert isinstance(database, SQLDataBase)
         self.database = database
-        self.domain = self.settings["DIALOGUE"]["domain"]
 
         self.agent_id = agent_id
         self.agent_role = agent_role
@@ -79,7 +78,6 @@ class DialogueManager(ConversationalModule):
             self.database,
             self.agent_id,
             self.agent_role,
-            self.domain,
             alpha=alpha,
             epsilon=epsilon,
             gamma=gamma,
@@ -93,7 +91,7 @@ class DialogueManager(ConversationalModule):
         if "policy_path" in policy_args:
             self.policy_path = policy_args["policy_path"]
 
-        self.DSTracker = DummyStateTracker(self.ontology, self.domain)
+        self.DSTracker = DummyStateTracker(self.ontology)
         self.load("")
 
     def get_RL_params(self, policy_args):

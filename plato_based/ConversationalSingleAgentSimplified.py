@@ -15,19 +15,18 @@ import os
 import random
 
 
-def build_domain_settings(configuration):
+def build_domain_settings(dialogue_config):
 
-    domain = configuration["DIALOGUE"]["domain"]
-    assert os.path.isfile(configuration["DIALOGUE"]["ontology_path"])
+    assert os.path.isfile(dialogue_config["ontology_path"])
 
-    ontology = Ontology.Ontology(configuration["DIALOGUE"]["ontology_path"])
-    assert os.path.isfile(configuration["DIALOGUE"]["db_path"])
+    ontology = Ontology.Ontology(dialogue_config["ontology_path"])
+    assert os.path.isfile(dialogue_config["db_path"])
 
     cache_sql_results = False
     database = DataBase.SQLDataBase(
-        configuration["DIALOGUE"]["db_path"], cache_sql_results
+        dialogue_config["db_path"], cache_sql_results
     )
-    return domain, ontology, database
+    return ontology, database
 
 
 class ConversationalSingleAgent:
@@ -48,7 +47,7 @@ class ConversationalSingleAgent:
 
         self.minibatch_length = 50
         self.train_interval = 10
-        self.train_epochs = 10
+        self.num_batches_per_epoch = 10
 
         self.SAVE_LOG = True
 
@@ -57,12 +56,8 @@ class ConversationalSingleAgent:
         self.MAX_TURNS = 15
 
         self.dialogue_turn = -1
-        self.ontology = None
-        self.database = None
-        self.domain = None
         self.dialogue_manager = None
         self.user_model = None
-        self.user_simulator = None
 
         self.agent_goal = None
         self.goal_generator = None
@@ -75,7 +70,7 @@ class ConversationalSingleAgent:
         # TODO: Handle this properly - get reward function type from config
         self.reward_func = SlotFillingReward()
 
-        self.domain, self.ontology, self.database = build_domain_settings(configuration)
+        self.ontology, self.database = build_domain_settings(configuration["DIALOGUE"])
         self.user_simulator = AgendaBasedUS(
             goal_generator=Goal.GoalGenerator(self.ontology, self.database),
             error_model=ErrorModel(
@@ -153,7 +148,7 @@ class ConversationalSingleAgent:
 
         rew, success = self.process_system_action(sys_response)
 
-        if self.prev_turnstate.state:
+        if self.prev_turnstate.state is not None:
             self.recorder.record(self.curr_state, self.prev_turnstate)
 
         self.dialogue_turn += 1
@@ -171,12 +166,7 @@ class ConversationalSingleAgent:
             and self.dialogue_episode % self.train_interval == 0
             and len(self.recorder.dialogues) >= self.minibatch_length
         ):
-
-            for epoch in range(self.train_epochs):
-                minibatch = random.sample(
-                    self.recorder.dialogues, self.minibatch_length
-                )
-                self.dialogue_manager.train(minibatch)
+            self.train_for_n_batches(self.num_batches_per_epoch)
 
         self.dialogue_episode += 1
         self.cumulative_rewards += self.recorder.dialogues[-1][-1].cumulative_reward
@@ -191,6 +181,13 @@ class ConversationalSingleAgent:
         dialogue_success = self.recorder.dialogues[-1][-1].success
         if dialogue_success:
             self.num_successful_dialogues += int(dialogue_success)
+
+    def train_for_n_batches(self,num_batches):
+        for _ in range(num_batches):
+            minibatch = random.sample(
+                self.recorder.dialogues, self.minibatch_length
+            )
+            self.dialogue_manager.train(minibatch)
 
     def terminated(self):
         return self.dialogue_manager.at_terminal_state()

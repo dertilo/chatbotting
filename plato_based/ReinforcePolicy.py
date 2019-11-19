@@ -25,14 +25,13 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
         database,
         agent_id=0,
         agent_role="system",
-        domain=None,
         alpha=0.2,
         epsilon=0.95,
         gamma=0.95,
         alpha_decay=0.995,
         epsilon_decay=0.9995,
     ):
-
+        domain = 'CamRest'#TODO(tilo): ???
         super(ReinforcePolicy, self).__init__()
 
         self.agent_id = agent_id

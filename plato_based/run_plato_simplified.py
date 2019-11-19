@@ -59,6 +59,9 @@ def update_progress_bar(ca, dialogue, pbar, running_factor):
     pbar.postfix[0]["dialogue"] = dialogue
     success = int(ca.recorder.dialogues[-1][-1].success)
     reward = int(ca.recorder.dialogues[-1][-1].cumulative_reward)
+    eps = ca.dialogue_manager.policy.epsilon
+    pbar.postfix[0]["eps"] = eps
+
     pbar.postfix[0]["success-rate"] = round(
         running_factor * pbar.postfix[0]["success-rate"]
         + (1 - running_factor) * success,
@@ -70,46 +73,52 @@ def update_progress_bar(ca, dialogue, pbar, running_factor):
     pbar.update()
 
 
-def arg_parse(cfg_filename: str = "config/train_reinforce.yaml"):
-
-    random.seed(time.time())
-
-    assert os.path.isfile(cfg_filename)
-    assert cfg_filename.endswith(".yaml")
-
-    with open(cfg_filename, "r") as file:
-        cfg_parser = yaml.load(file, Loader=yaml.Loader)
-
-    interaction_mode = "simulation"
-    num_agents = 1
-
-    dialogues = int(cfg_parser["DIALOGUE"]["num_dialogues"])
-
-    if "interaction_mode" in cfg_parser["GENERAL"]:
-        interaction_mode = cfg_parser["GENERAL"]["interaction_mode"]
-
-        if "agents" in cfg_parser["GENERAL"]:
-            num_agents = int(cfg_parser["GENERAL"]["agents"])
-
-        elif interaction_mode == "multi_agent":
-            print(
-                "WARNING! Multi-Agent interaction mode selected but "
-                "number of agents is undefined in config."
-            )
-
-    return {
-        "cfg_parser": cfg_parser,
-        "dialogues": dialogues,
-        "interaction_mode": interaction_mode,
-        "num_agents": num_agents,
-        "test_mode": False,
-    }
-
 
 if __name__ == "__main__":
-    arguments = arg_parse(
-        cfg_filename="/home/tilo/code/OKS/alex-plato/Config/simulate_agenda_dacts_train.yaml"
-    )
-    statistics = run_single_agent(arguments["cfg_parser"], 100)
+    config = {
+        "GENERAL": {
+            "agents": 1,
+            "runs": 5,
+            "experience_logs": {
+                "save": True,
+                "load": False,
+                "path": "Logs/simulate_agenda",
+            },
+        },
+        "DIALOGUE": {
+            "num_dialogues": 1000,
+            "initiative": "system",
+            # "domain": "CamRest",
+            "ontology_path": "/home/tilo/code/OKS/alex-plato/Domain/alex-rules.json",
+            "db_path": "/home/tilo/code/OKS/alex-plato/Domain/alex-dbase.db",
+            "db_type": "sql",
+        },
+        "AGENT_0": {
+            # "role": "system",
+            # "USER_SIMULATOR": {
+            #     "simulator": "agenda",
+            #     "patience": 5,
+            #     "pop_distribution": [1.0],
+            #     "slot_confuse_prob": 0.0,
+            #     "op_confuse_prob": 0.0,
+            #     "value_confuse_prob": 0.0,
+            # },
+            "DM": {
+                "policy": {
+                    "type": "reinforce",
+                    "train": True,
+                    "learning_rate": 0.25,
+                    "exploration_rate": 1.0,
+                    "discount_factor": 0.95,
+                    "learning_decay_rate": 0.95,
+                    "exploration_decay_rate": 1.0,
+                    "policy_path": "/tmp/policy_sys.pkl",
+                }
+            },
+            "DST": {"dst": "dummy"},
+        },
+    }
+
+    statistics = run_single_agent(config, 100)
 
     pprint(f"Results:\n{statistics}")
