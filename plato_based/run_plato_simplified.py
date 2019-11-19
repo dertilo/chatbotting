@@ -111,7 +111,7 @@ if __name__ == "__main__":
                     "exploration_rate": 1.0,
                     "discount_factor": 0.95,
                     "learning_decay_rate": 0.95,
-                    "exploration_decay_rate": 1.0,
+                    "exploration_decay_rate": .95,
                     "policy_path": "/tmp/policy_sys.pkl",
                 }
             },
@@ -119,6 +119,6 @@ if __name__ == "__main__":
         },
     }
 
-    statistics = run_single_agent(config, 100)
+    statistics = run_single_agent(config, 400)
 
     pprint(f"Results:\n{statistics}")

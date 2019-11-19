@@ -24,18 +24,16 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
         ontology,
         database,
         agent_id=0,
-        agent_role="system",
         alpha=0.2,
         epsilon=0.95,
         gamma=0.95,
         alpha_decay=0.995,
         epsilon_decay=0.9995,
     ):
-        domain = 'CamRest'#TODO(tilo): ???
+        domain = "CamRest"  # TODO(tilo): ???
         super(ReinforcePolicy, self).__init__()
 
         self.agent_id = agent_id
-        self.agent_role = agent_role
 
         self.IS_GREEDY = False
 
@@ -60,8 +58,6 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
         self.warmup_simulator = None
 
         self.warmup_policy = HandcraftedPolicy(self.ontology)
-
-        self.tf_scope = "policy_" + self.agent_role + "_" + str(self.agent_id)
 
         # Default value
         self.is_training = True
@@ -164,7 +160,7 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
             print(
                 "Reinforce DialoguePolicy {0} automatically determined "
                 "number of state features: {1}".format(
-                    self.agent_role, self.NStateFeatures
+                    'system', self.NStateFeatures
                 )
             )
         if domain == "CamRest":
@@ -175,7 +171,7 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
         self.NActions, self.NOtherActions = na, noa
         print(
             "Reinforce {0} DialoguePolicy Number of Actions: {1}".format(
-                self.agent_role, self.NActions
+                'system', self.NActions
             )
         )
 
@@ -199,15 +195,6 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
         if "is_training" in kwargs:
             self.is_training = bool(kwargs["is_training"])
 
-            if self.agent_role == "user" and self.warmup_simulator:
-                if "goal" in kwargs:
-                    self.warmup_simulator.initialize({kwargs["goal"]})
-                else:
-                    print(
-                        "WARNING ! No goal provided for Reinforce policy "
-                        "user simulator @ initialize"
-                    )
-                    self.warmup_simulator.initialize({})
 
         if "policy_path" in kwargs:
             self.policy_path = kwargs["policy_path"]
@@ -231,37 +218,13 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
             self.weights = np.random.rand(self.NStateFeatures, self.NActions)
 
     def restart(self, args):
-
-        if self.agent_role == "user" and self.warmup_simulator:
-            if "goal" in args:
-                self.warmup_simulator.initialize(args)
-            else:
-                print(
-                    "WARNING! No goal provided for Reinforce policy user "
-                    "simulator @ restart"
-                )
-                self.warmup_simulator.initialize({})
+        pass
 
     def next_action(self, state: SlotFillingDialogueState):
 
         if self.is_training and random.random() < self.epsilon:
-            if random.random() < 1.0:
+            return self.warmup_policy.next_action(state)
 
-                if self.agent_role == "system":
-                    return self.warmup_policy.next_action(state)
-
-                else:
-                    self.warmup_simulator.receive_input(
-                        state.user_acts, state.user_goal
-                    )
-                    return self.warmup_simulator.respond()
-
-            else:
-                assert False
-                return self.decode_action(
-                    random.choice(range(0, self.NActions)), self.agent_role == "system"
-                )
-        assert False
         # Probabilistic policy: Sample from action wrt probabilities
         probs = self.calculate_policy(self.encode_state(state))
 
@@ -270,9 +233,7 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
                 "WARNING! NAN detected in action probabilities! Selecting "
                 "random action."
             )
-            return self.decode_action(
-                random.choice(range(0, self.NActions)), self.agent_role == "system"
-            )
+            return self.decode_action(random.choice(range(0, self.NActions)))
 
         if self.IS_GREEDY:
             # Get greedy action
@@ -281,23 +242,17 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
 
             # Break ties randomly
             if maxima:
-                sys_acts = self.decode_action(
-                    random.choice(maxima), self.agent_role == "system"
-                )
+                sys_acts = self.decode_action(random.choice(maxima))
             else:
                 print(
-                    f"--- {self.agent_role}: Warning! No maximum value "
+                    f"--- {'system'}: Warning! No maximum value "
                     f"identified for policy. Selecting random action."
                 )
-                return self.decode_action(
-                    random.choice(range(0, self.NActions)), self.agent_role == "system"
-                )
+                return self.decode_action(random.choice(range(0, self.NActions)))
         else:
             # Pick from top 3 actions
             top_3 = np.argsort(-probs)[0:2]
-            sys_acts = self.decode_action(
-                random.choices(top_3, probs[top_3])[0], self.agent_role == "system"
-            )
+            sys_acts = self.decode_action(random.choices(top_3, probs[top_3])[0])
 
         return sys_acts
 
@@ -340,7 +295,7 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
                 if len(state_enc) != self.NStateFeatures:
                     raise ValueError(
                         f"Reinforce DialoguePolicy "
-                        f"{self.agent_role} mismatch in state"
+                        f"{'system'} mismatch in state"
                         f"dimensions: State Features: "
                         f"{self.NStateFeatures} != State "
                         f"Encoding Length: {len(state_enc)}"
@@ -378,59 +333,12 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
     def encode_state(self, state):
 
         temp = [int(state.is_terminal_state), int(state.system_made_offer)]
+        for value in state.slots_filled.values():
+            # This contains the requested slot
+            temp.append(1) if value else temp.append(0)
 
-        if self.agent_role == "user":
-            # The user agent needs to know which constraints and requests
-            # need to be communicated and which of them
-            # actually have.
-            if state.user_goal:
-                for c in self.informable_slots:
-                    if c != "name":
-                        if c in state.user_goal.constraints:
-                            temp.append(1)
-                        else:
-                            temp.append(0)
-
-                for c in self.informable_slots:
-                    if c != "name":
-                        if (
-                            c in state.user_goal.actual_constraints
-                            and state.user_goal.actual_constraints[c].value
-                        ):
-                            temp.append(1)
-                        else:
-                            temp.append(0)
-
-                for r in self.requestable_slots:
-                    if r in state.user_goal.requests:
-                        temp.append(1)
-                    else:
-                        temp.append(0)
-
-                for r in self.requestable_slots:
-
-                    if (
-                        r in state.user_goal.actual_requests
-                        and state.user_goal.actual_requests[r].value
-                    ):
-                        temp.append(1)
-                    else:
-                        temp.append(0)
-
-            else:
-                temp += (
-                    [0]
-                    * 2
-                    * (len(self.informable_slots) - 1 + len(self.requestable_slots))
-                )
-
-        if self.agent_role == "system":
-            for value in state.slots_filled.values():
-                # This contains the requested slot
-                temp.append(1) if value else temp.append(0)
-
-            for r in self.requestable_slots:
-                temp.append(1) if r == state.requested_slot else temp.append(0)
+        for r in self.requestable_slots:
+            temp.append(1) if r == state.requested_slot else temp.append(0)
 
         return temp
 
@@ -463,7 +371,7 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
         # Default fall-back action
         print(
             "Reinforce ({0}) policy action encoder warning: Selecting "
-            "default action (unable to encode: {1})!".format(self.agent_role, action)
+            "default action (unable to encode: {1})!".format('system', action)
         )
         return -1
 
@@ -506,7 +414,7 @@ class ReinforcePolicy(DialoguePolicy.DialoguePolicy):
         # Default fall-back action
         print(
             "Reinforce DialoguePolicy ({0}) policy action decoder warning: "
-            "Selecting default action (index: {1})!".format(self.agent_role, action_enc)
+            "Selecting default action (index: {1})!".format('system', action_enc)
         )
         return [DialogueAct("bye", [])]
 

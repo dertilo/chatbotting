@@ -77,7 +77,6 @@ class DialogueManager(ConversationalModule):
             self.ontology,
             self.database,
             self.agent_id,
-            self.agent_role,
             alpha=alpha,
             epsilon=epsilon,
             gamma=gamma,
