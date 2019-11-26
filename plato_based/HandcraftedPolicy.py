@@ -34,6 +34,33 @@ def build_inform_act(dialogue_state: SlotFillingDialogueState):
     return dact
 
 
+def make_request(unfilled_slots):
+    slot = random.choice(unfilled_slots)
+    dacts = [DialogueAct("request", [DialogueActItem(slot, Operator.EQ, "")])]
+    return dacts
+
+
+def make_offer(ds):
+    name = ds.item_in_focus["name"] if "name" in ds.item_in_focus else "unknown"
+    dacts = [DialogueAct("offer", [DialogueActItem("name", Operator.EQ, name)])]
+    inform_acts = [
+        build_inform(slot, ds)
+        for slot in ds.slots_filled
+        if slot != "requested" and ds.slots_filled[slot] and slot not in ["id", "name"]
+    ]
+    dacts += inform_acts
+    return dacts
+
+
+def build_inform(slot, ds: SlotFillingDialogueState):
+    if slot in ds.item_in_focus:
+        value = ds.item_in_focus[slot]
+    else:
+        value = "no info"
+
+    return DialogueAct("inform", [DialogueActItem(slot, Operator.EQ, value)])
+
+
 class HandcraftedPolicy:
     def __init__(self, ontology: Ontology.Ontology):
         super(HandcraftedPolicy, self).__init__()
@@ -42,97 +69,22 @@ class HandcraftedPolicy:
     def next_action(self, ds: SlotFillingDialogueState):
         if ds.is_terminal_state:
             dacts = [DialogueAct("bye", [DialogueActItem("", Operator.EQ, "")])]
-        elif ds.requested_slot and ds.item_in_focus and ds.system_made_offer:
+        elif ds.requested_slot != "" and ds.item_in_focus and ds.system_made_offer:
             dacts = build_inform_act(ds)
         else:
-            dacts = self.handle_else(ds)
+            dacts = self.request_slots_or_make_offer(ds)
         return dacts
 
-    def handle_else(self, dialogue_state:SlotFillingDialogueState):
-        # Else, if no item is in focus or no offer has been made,
-        # ignore the user's request
-        # Try to fill slots
-        requestable_slots = deepcopy(self.ontology.ontology["system_requestable"])
-        if (
-            not hasattr(dialogue_state, "requestable_slot_entropies")
-            or not dialogue_state.requestable_slot_entropies
-        ):
-            slot = random.choice(requestable_slots)
-
-            while dialogue_state.slots_filled[slot] and len(requestable_slots) > 1:
-                requestable_slots.remove(slot)
-                slot = random.choice(requestable_slots)
-
+    def request_slots_or_make_offer(self, ds: SlotFillingDialogueState):
+        unfilled_slots = [
+            s
+            for s in self.ontology.ontology["system_requestable"]
+            if ds.slots_filled[s] is None
+        ]
+        if len(unfilled_slots) > 0:
+            dacts = make_request(unfilled_slots)
+        elif ds.item_in_focus:
+            dacts = make_offer(ds)
         else:
-            assert False
-            slot = ""
-            slots = [
-                k
-                for k, v in dialogue_state.requestable_slot_entropies.items()
-                if v == max(dialogue_state.requestable_slot_entropies.values())
-                and v > 0
-                and k in requestable_slots
-            ]
-
-            if slots:
-                slot = random.choice(slots)
-
-                while (
-                    dialogue_state.slots_filled[slot]
-                    and dialogue_state.requestable_slot_entropies[slot] > 0
-                    and len(requestable_slots) > 1
-                ):
-                    requestable_slots.remove(slot)
-                    slots = [
-                        k
-                        for k, v in dialogue_state.requestable_slot_entropies.items()
-                        if v == max(dialogue_state.requestable_slot_entropies.values())
-                        and k in requestable_slots
-                    ]
-
-                    if slots:
-                        slot = random.choice(slots)
-                    else:
-                        break
-        if slot and not dialogue_state.slots_filled[slot]:
-            dacts = [DialogueAct("request", [DialogueActItem(slot, Operator.EQ, "")])]
-
-        elif dialogue_state.item_in_focus:
-            name = (
-                dialogue_state.item_in_focus["name"]
-                if "name" in dialogue_state.item_in_focus
-                else "unknown"
-            )
-
-            dacts = [DialogueAct("offer", [DialogueActItem("name", Operator.EQ, name)])]
-
-            for slot in dialogue_state.slots_filled:
-                if slot != "requested" and dialogue_state.slots_filled[slot]:
-                    if slot in dialogue_state.item_in_focus:
-                        if slot not in ["id", "name"]:
-                            dacts.append(
-                                DialogueAct(
-                                    "inform",
-                                    [
-                                        DialogueActItem(
-                                            slot,
-                                            Operator.EQ,
-                                            dialogue_state.item_in_focus[slot],
-                                        )
-                                    ],
-                                )
-                            )
-                    else:
-                        dacts.append(
-                            DialogueAct(
-                                "inform",
-                                [DialogueActItem(slot, Operator.EQ, "no info")],
-                            )
-                        )
-        else:
-            # Fallback action - cannot help!
-            # Note: We can have this check (no item in focus) at the beginning,
-            # but this would assume that the system
-            # queried a database before coming in here.
             dacts = [DialogueAct("canthelp", [])]
         return dacts
