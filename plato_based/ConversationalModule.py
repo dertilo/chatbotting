@@ -65,17 +65,17 @@ class ConversationalModule(ABC):
         """
         pass
 
-    # This is used only to update internal state - there is no output
-    def generic_receive_input(self, args: ConversationalFrame):
-        """
-
-        :param args:
-        :return:
-        """
-        if not isinstance(args, ConversationalFrame):
-            args = ConversationalFrame(args)
-
-        self.receive_input(args.content)
+    # # This is used only to update internal state - there is no output
+    # def generic_receive_input(self, args: ConversationalFrame):
+    #     """
+    #
+    #     :param args:
+    #     :return:
+    #     """
+    #     if not isinstance(args, ConversationalFrame):
+    #         args = ConversationalFrame(args)
+    #
+    #     self.receive_input(args.content)
 
     @abstractmethod
     # Arguments may not be necessary for stateful modules

@@ -1,8 +1,12 @@
+from typing import List
+
 from State import SlotFillingDialogueState
 from abc import ABC, abstractmethod
 
 from Ontology import Ontology
 from copy import deepcopy
+
+from dialog_action_classes import DialogueAct
 
 
 class DummyStateTracker(object):
@@ -36,7 +40,7 @@ class DummyStateTracker(object):
 
         self.DState.turn = 0
 
-    def update_state(self, dacts):
+    def update_state(self, dacts:List[DialogueAct]):
         """
         Update the dialogue state given the input dialogue acts. This function
         basically tracks which intents, slots, and values have been mentioned
@@ -72,6 +76,7 @@ class DummyStateTracker(object):
                     # THIS APPLIES TO THE FOLLOWING RULES AS WELL
 
                     if dact_item.slot == "slot" and dact_item.value:
+                        assert False #TODO(tilo): ???
                         # Case where we have request(slot = slot_name)
                         self.DState.requested_slot = dact_item.value
                     else:

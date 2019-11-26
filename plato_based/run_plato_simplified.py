@@ -7,14 +7,14 @@ import yaml
 import os.path
 import time
 import random
-
+import numpy as np
 
 def run_single_agent(config, num_dialogues):
     ca = ConversationalSingleAgent(config)
     ca.initialize()
 
     params_to_monitor = {"dialogue": 0, "success-rate": 0.0, "reward": 0.0}
-    running_factor = 0.99
+    running_factor = np.exp(np.log(0.05)/100) # after 100 steps sunk to 0.05
     with tqdm(postfix=[params_to_monitor]) as pbar:
 
         for dialogue in range(num_dialogues):
@@ -86,7 +86,6 @@ if __name__ == "__main__":
             },
         },
         "DIALOGUE": {
-            "num_dialogues": 1000,
             "initiative": "system",
             # "domain": "CamRest",
             "ontology_path": "/home/tilo/code/OKS/alex-plato/Domain/alex-rules.json",
@@ -111,7 +110,7 @@ if __name__ == "__main__":
                     "exploration_rate": 1.0,
                     "discount_factor": 0.95,
                     "learning_decay_rate": 0.95,
-                    "exploration_decay_rate": .95,
+                    "exploration_decay_rate": 1.0,
                     "policy_path": "/tmp/policy_sys.pkl",
                 }
             },
@@ -119,6 +118,6 @@ if __name__ == "__main__":
         },
     }
 
-    statistics = run_single_agent(config, 400)
+    statistics = run_single_agent(config, 100)
 
     pprint(f"Results:\n{statistics}")

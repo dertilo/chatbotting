@@ -34,28 +34,21 @@ def build_inform_act(dialogue_state: SlotFillingDialogueState):
     return dact
 
 
-class HandcraftedPolicy(DialoguePolicy):
+class HandcraftedPolicy:
     def __init__(self, ontology: Ontology.Ontology):
         super(HandcraftedPolicy, self).__init__()
         self.ontology = ontology
 
-    def next_action(self, dialogue_state: SlotFillingDialogueState):
-        # Check for terminal state
-        if dialogue_state.is_terminal_state:
+    def next_action(self, ds: SlotFillingDialogueState):
+        if ds.is_terminal_state:
             dacts = [DialogueAct("bye", [DialogueActItem("", Operator.EQ, "")])]
-
-        # Check if the user has made any requests
-        elif (
-            dialogue_state.requested_slot
-            and dialogue_state.item_in_focus
-            and dialogue_state.system_made_offer
-        ):
-            dacts = build_inform_act(dialogue_state)
+        elif ds.requested_slot and ds.item_in_focus and ds.system_made_offer:
+            dacts = build_inform_act(ds)
         else:
-            dacts = self.handle_else(dialogue_state)
+            dacts = self.handle_else(ds)
         return dacts
 
-    def handle_else(self, dialogue_state):
+    def handle_else(self, dialogue_state:SlotFillingDialogueState):
         # Else, if no item is in focus or no offer has been made,
         # ignore the user's request
         # Try to fill slots
@@ -71,6 +64,7 @@ class HandcraftedPolicy(DialoguePolicy):
                 slot = random.choice(requestable_slots)
 
         else:
+            assert False
             slot = ""
             slots = [
                 k
@@ -142,39 +136,3 @@ class HandcraftedPolicy(DialoguePolicy):
             # queried a database before coming in here.
             dacts = [DialogueAct("canthelp", [])]
         return dacts
-
-    def train(self, data):
-        """
-        Nothing to do here.
-
-        :param data:
-        :return:
-        """
-        pass
-
-    def restart(self, args):
-        """
-        Nothing to do here.
-
-        :param args:
-        :return:
-        """
-        pass
-
-    def save(self, path=None):
-        """
-        Nothing to do here.
-
-        :param path:
-        :return:
-        """
-        pass
-
-    def load(self, path):
-        """
-        Nothing to do here.
-
-        :param path:
-        :return:
-        """
-        pass
