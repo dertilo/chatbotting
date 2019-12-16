@@ -88,8 +88,8 @@ if __name__ == "__main__":
         "DIALOGUE": {
             "initiative": "system",
             # "domain": "CamRest",
-            "ontology_path": "/home/tilo/code/OKS/alex-plato/Domain/alex-rules.json",
-            "db_path": "/home/tilo/code/OKS/alex-plato/Domain/alex-dbase.db",
+            "ontology_path": "/home/tilo/code/DIALOGUE/alex-plato/Domain/alex-rules.json",
+            "db_path": "/home/tilo/code/DIALOGUE/alex-plato/Domain/alex-dbase.db",
             "db_type": "sql",
         },
         "AGENT_0": {
@@ -107,7 +107,7 @@ if __name__ == "__main__":
                     "type": "reinforce",
                     "train": True,
                     "learning_rate": 0.25,
-                    "exploration_rate": 1.0,
+                    "exploration_rate": 0.0,
                     "discount_factor": 0.95,
                     "learning_decay_rate": 0.95,
                     "exploration_decay_rate": 1.0,
@@ -118,6 +118,6 @@ if __name__ == "__main__":
         },
     }
 
-    statistics = run_single_agent(config, 100)
+    statistics = run_single_agent(config, 500)
 
     pprint(f"Results:\n{statistics}")
